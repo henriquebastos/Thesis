@@ -35,11 +35,17 @@ class Communicator(object):
         self.fd_write = None
         self.fd_read = None
         self.input_field = None
+        self.input_event = None
+        self.user_inputs = None
+        self.user_inputs_index = 0
 
-    def communicate(self, fd_write, fd_read, file, input_field=None):
+    def communicate(self, fd_write, fd_read, file, input_field=None,
+            input_event=None, user_inputs=None):
         self.fd_write = fd_write
         self.fd_read = fd_read
         self.input_field = input_field
+        self.input_event = input_event
+        self.user_inputs = user_inputs
         data = get_expressions(file)
         lineno = 0
         while lineno >= 0:
@@ -51,7 +57,6 @@ class Communicator(object):
                 lineno = 0
             self.executed_lines.append(lineno)
             os.write(self.fd_write, 's\n')
-            
             if self.call > 1000:  # Terminate on long loops
                 return
 
@@ -70,10 +75,9 @@ class Communicator(object):
 
     def evaluate_line(self, data, lineno):
         if ('type' in data[lineno] and data[lineno]['type'] == 'func' and
-                    'declared' not in data[lineno]):
-                data[lineno]['declared'] = True
+                'declared' not in data[lineno]):
+            data[lineno]['declared'] = True
         else:
-            # print '\t\t{0} - {1}'.format(lineno, self.should_execute_previous)
             if self.should_execute_previous:
                 previous_lineno = self.executed_lines[
                     len(self.executed_lines)-1]
@@ -104,21 +108,24 @@ class Communicator(object):
                 self.executed_code[self.call]['result'] = result
                 self.call += 1
 
-
     def evaluate_assign(self, data, lineno):
         if has_user_input_call(data, lineno):
             os.write(self.fd_write, 's\n')
-            
             if self.input_field is None:
                 print "ERROR!!! BREAK"
                 user_input = '10'
             else:
-                user_input = self.input_field.get()
-                while user_input is '':
+                if (len(self.user_inputs) > 0 and
+                        self.user_inputs_index < len(self.user_inputs)):
+                    user_input = self.user_inputs[self.user_inputs_index]
+                    self.user_inputs_index += 1
+                else:
+                    self.input_event.wait()
                     user_input = self.input_field.get()
-                    time.sleep(2)
-                self.input_field.delete(0, len(user_input))
-
+                    self.user_inputs.append(user_input)
+                    self.input_field.delete(0, len(user_input))
+                    self.user_inputs_index += 1
+                    self.input_event.clear()
             os.write(self.fd_write, str(user_input) + '\n')
             while '--Return--' not in os.read(self.fd_read, 1000):
                 os.write(self.fd_write, 's\n')
@@ -189,7 +196,8 @@ class Communicator(object):
         final_expression = None
         if 'expressions' in data[lineno]:
             self.setup_executed_code(lineno)
-            final_expression = self.evaluate(data[lineno]['expressions'], False)
+            final_expression = self.evaluate(data[lineno]['expressions'],
+                                             False)
         return final_expression
 
     def evaluate_targets(self, data, lineno):
@@ -219,7 +227,7 @@ def launch_child(fd_write, fd_read, file):
     os.execlp('python', 'Debugger', 'pdb.py', file)
 
 
-def main(file, input_field=None):
+def main(file, input_field=None, input_event=None, user_inputs=None):
     communicator_read, communicator_write = os.pipe()
     debugger_read, debugger_write = os.pipe()
     pid = os.fork()
@@ -227,7 +235,8 @@ def main(file, input_field=None):
         os.close(communicator_read)
         os.close(debugger_write)
         communicator = Communicator()
-        communicator.communicate(communicator_write, debugger_read, file, input_field)
+        communicator.communicate(communicator_write, debugger_read, file,
+                                 input_field, input_event, user_inputs)
     else:  # Child
         os.close(debugger_read)
         os.close(communicator_write)
@@ -235,13 +244,13 @@ def main(file, input_field=None):
     os.kill(pid, signal.SIGKILL)
     # print communicator.executed_lines
     print communicator.executed_code
-    for key,value in communicator.executed_code.iteritems():
+    for key, value in communicator.executed_code.iteritems():
         print '{0}: Lineno: {1}'.format(key, value['lineno'])
         if 'result' in value:
             value['result'] = value['result'].rstrip('\n(Pdb) ')
             print 'Result: {0}'.format(value['result'])
         print 'Values:'
-        for k,v in value['values'].iteritems():
+        for k, v in value['values'].iteritems():
             v = v.rstrip('\n(Pdb) ')
             value['values'][k] = v
             print '\t{0}: {1}'.format(k, v)

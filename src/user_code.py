@@ -15,6 +15,7 @@ q = mult(a, b)
 c = 7
 d = 8
 mult(c, sum(a,b))
-a = [0, 1, 2, 3]
-print len(a)
-z = input('Test ')
+a = [0, 1, 2, 3] # No Output
+z = input()
+
+print a

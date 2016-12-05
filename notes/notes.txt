@@ -3,8 +3,11 @@ variable scope
 
 
 loops (Solution one finish after 1000 steps, )
-input window
+input window --> Solution: Event handling. TODO add window to add input window to change previous choices
 drag/drop
 UI
 files
 other data type visuals
+mapping executed code to code box
+validation
+scope
