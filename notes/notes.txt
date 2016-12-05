@@ -1,0 +1,10 @@
+folding editors
+variable scope
+
+
+loops (Solution one finish after 1000 steps, )
+input window
+drag/drop
+UI
+files
+other data type visuals

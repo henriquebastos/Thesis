@@ -1,0 +1,19 @@
+Module(
+   body=[
+      Assign(
+         targets=[Name(id='dim', ctx=Store())], 
+         value=Call(
+            func=Name(id='input', ctx=Load()), 
+            args=[Str(s='Enter maze size: ')], 
+            keywords=[],
+            starargs=None, 
+            kwargs=None)), 
+      Assign(
+         targets=[Name(id='height', ctx=Store())], 
+         value=Call(
+            func=Name(id='int', ctx=Load()), 
+            args=[Name(id='dim', ctx=Load())], 
+            keywords=[], 
+            starargs=None, 
+            kwargs=None)), 
+      Print(dest=None, values=[Name(id='height', ctx=Load())], nl=True)])
