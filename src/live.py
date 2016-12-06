@@ -22,8 +22,8 @@ communicationThread = None
 input_event = threading.Event()
 
 
-def display_executed_code(executed_code, executed_code_box, variable_box,
-                          output_box, total):
+def display_executed_code(executed_code, code_box, executed_code_box,
+                          variable_box, output_box, total):
     display_map = {}
     tab_count = 0
     for key, value in executed_code.iteritems():
@@ -59,6 +59,20 @@ def display_executed_code(executed_code, executed_code_box, variable_box,
         tab_count += 1
     for key, value in display_map.iteritems():
         executed_code_box.insert(float(key), value)
+        print 'key: {0} value: {1}'.format(key, value)
+        executed_code_box.tag_add('line{0}'.format(key),
+                                  '{0}.0'.format(key),
+                                  '{0}.{1}'.format(key, len(value)))
+        executed_code_box.tag_bind(
+            'line{0}'.format(key),
+            '<Enter>',
+            lambda event, x=executed_code_box, y=key, z=len(value),
+                opt=code_box: add_highlight(event, x, y, z, opt))
+        executed_code_box.tag_bind(
+            'line{0}'.format(key),
+            '<Leave>',
+            lambda event, x=executed_code_box, y=key, z=len(value),
+                opt=code_box: remove_highlight(event, x, y, z, opt))
 
 
 def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
@@ -69,13 +83,50 @@ def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
         executed_code_box.insert(float(i), '\n')
 
 
-def highlight_code(code_box, event=None):
-    code_box.mark_set("range_start", "1.0")
-    data = code_box.get("1.0", "end-1c")
+def highlight_code(code_box):
+    code_box.mark_set('range_start', '1.0')
+    data = code_box.get('1.0', 'end-1c')
     for token, content in lex(data, PythonLexer()):
-        code_box.mark_set("range_end", "range_start + %dc" % len(content))
-        code_box.tag_add(str(token), "range_start", "range_end")
-        code_box.mark_set("range_start", "range_end")
+        code_box.mark_set('range_end', 'range_start + %dc' % len(content))
+        code_box.tag_add(str(token), 'range_start', 'range_end')
+        code_box.mark_set('range_start', 'range_end')
+
+
+def add_highlight(event, code_box, line_count, line_length, opt=None):
+    code_box.tag_add('HIGHLIGHT','{0}.0'.format(line_count),
+                     '{0}.{1}'.format(line_count, line_length))
+    if opt is not None:
+        opt.tag_add('HIGHLIGHT','{0}.0'.format(line_count),
+                     '{0}.{1}'.format(line_count, line_length))
+
+
+def remove_highlight(event, code_box, line_count, line_length, opt=None):
+    code_box.tag_remove('HIGHLIGHT','{0}.0'.format(line_count),
+                     '{0}.{1}'.format(line_count, line_length))
+    if opt is not None:
+        opt.tag_remove('HIGHLIGHT','{0}.0'.format(line_count),
+                     '{0}.{1}'.format(line_count, line_length))
+
+
+def tag_lines(code_box, executed_code_box):
+    data = code_box.get('0.0', 'end-1c')
+    lines = str(data).split('\n')
+    line_count = 1
+    for line in lines:
+        code_box.tag_add('line{0}'.format(line_count),
+                         '{0}.0'.format(line_count),
+                         '{0}.{1}'.format(line_count, len(line)))
+        code_box.tag_bind(
+            'line{0}'.format(line_count),
+            '<Enter>',
+            lambda event, x=code_box, y=line_count, z=len(line),
+                opt=executed_code_box: add_highlight(event, x, y, z, opt))
+        code_box.tag_bind(
+            'line{0}'.format(line_count),
+            '<Leave>',
+            lambda event, x=code_box, y=line_count, z=len(line),
+                opt=executed_code_box: remove_highlight(event, x, y, z, opt))
+        line_count += 1
 
 
 class CommunicationThread(threading.Thread):
@@ -129,6 +180,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
 
     if user_code != new_user_code:
         highlight_code(from_box)
+        tag_lines(from_box, executed_code_box)
         user_code = new_user_code
         with open(FILE_NAME, "w") as code_file:
             code_file.write(user_code)
@@ -141,7 +193,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
     elif scale.get() < scale_size or scale.get() != prev_scale_setting:
         prev_scale_setting = scale.get()
         reset_boxes(new_user_code, executed_code_box, variable_box, output_box)
-        display_executed_code(executed_code, executed_code_box, variable_box,
+        display_executed_code(executed_code, from_box, executed_code_box, variable_box,
                               output_box, scale.get())
 
     if communicationThread is not None and not communicationThread.isAlive():
@@ -153,7 +205,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         scale.set(len(executed_code))
         scale_size = len(executed_code)
         prev_scale_setting = scale_size
-        display_executed_code(executed_code, executed_code_box,
+        display_executed_code(executed_code, from_box, executed_code_box,
                               variable_box, output_box, scale_size)
 
     if len(input_field.get()) > 0:
@@ -222,6 +274,7 @@ class Application(Frame):
         code_box.tag_configure('Token.Name.Builtin', foreground='cyan')
         code_box.tag_configure('Token.Literal.String.Single',
                                foreground='yellow')
+        code_box.tag_configure('HIGHLIGHT', background='gray5')
         if os.path.isfile(FILE_NAME):
             with open(FILE_NAME, 'r') as code_file:
                 lines = code_file.readlines()
@@ -229,7 +282,9 @@ class Application(Frame):
                     code_box.insert(INSERT, line)
         code_box.pack({'side': 'left'})
 
-        executed_code_box = Text(executed_code_frame, wrap=NONE)
+        executed_code_box = Text(executed_code_frame, foreground='white',
+                                 background='gray15', wrap=NONE)
+        executed_code_box.tag_configure('HIGHLIGHT', background='gray5')
         executed_code_box.pack({'side': 'left'})
 
         input_box = Text(input_frame)

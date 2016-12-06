@@ -16,6 +16,4 @@ c = 7
 d = 8
 mult(c, sum(a,b))
 a = [0, 1, 2, 3] # No Output
-z = input()
-
 print a
