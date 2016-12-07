@@ -23,6 +23,10 @@ def combine_data(lineno, target_data, from_data):
         target_data[lineno]['type'] = from_data[lineno]['type']
     if 'assigned' in from_data[lineno]:
         target_data[lineno]['assigned'] = from_data[lineno]['assigned']
+    if 'function_lines' in from_data[lineno]:
+            target_data[lineno]['function_lines'] = from_data[lineno]['function_lines']
+    if 'additional_lines' in from_data[lineno]:
+            target_data[lineno]['additional_lines'] = from_data[lineno]['additional_lines']
 
 
 def combine_all_data(target_data, from_data):
@@ -34,6 +38,10 @@ def combine_all_data(target_data, from_data):
             target_data[lineno]['type'] = from_data[lineno]['type']
         if 'assigned' in from_data[lineno]:
             target_data[lineno]['assigned'] = from_data[lineno]['assigned']
+        if 'function_lines' in from_data[lineno]:
+            target_data[lineno]['function_lines'] = from_data[lineno]['function_lines']
+        if 'additional_lines' in from_data[lineno]:
+            target_data[lineno]['additional_lines'] = from_data[lineno]['additional_lines']
 
 
 def combine_target_data(lineno, data, from_data):
@@ -85,3 +93,31 @@ def set_assigned_expressions(data, lineno, assigned, expressions):
 def set_name(data, lineno, name):
     setup_data(data, lineno)
     data[lineno]['name'] = name
+
+
+def setup_function_lines(data):
+    if 'function_lines' not in data:
+        data['function_lines'] = {}
+
+
+def add_function_def(data, name, lineno):
+    setup_function_lines(data)
+    data['function_lines'][name] = [lineno]
+
+
+def add_function_line(data, name, lineno):
+    data['function_lines'][name].append(lineno)
+
+
+def setup_additional_lines(data, lineno):
+    setup_data(data, lineno)
+    if 'additional_lines' not in data[lineno]:
+        data[lineno]['additional_lines'] = []
+
+
+def add_additiona_lines(data, lineno, func_name):
+    setup_additional_lines(data, lineno)
+    if func_name not in data[lineno]['additional_lines']:
+        data[lineno]['additional_lines'].append(func_name)
+        # for line in data['function_lines'][func_name]:
+        #     data[lineno]['additional_lines'].append(line)

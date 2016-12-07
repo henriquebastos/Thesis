@@ -38,6 +38,9 @@ class Communicator(object):
         self.input_event = None
         self.user_inputs = None
         self.user_inputs_index = 0
+        self.data = None
+        self.additional_lines_call_point = {}
+        self.looking_for = []
 
     def communicate(self, fd_write, fd_read, file, input_field=None,
             input_event=None, user_inputs=None):
@@ -46,13 +49,13 @@ class Communicator(object):
         self.input_field = input_field
         self.input_event = input_event
         self.user_inputs = user_inputs
-        data = get_expressions(file)
+        self.data = get_expressions(file)
         lineno = 0
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
             lineno = self.parse_line(output)
-            if lineno in data:
-                self.evaluate_line(data, lineno)
+            if lineno in self.data:
+                self.evaluate_line(self.data, lineno)
             if lineno == -2:
                 lineno = 0
             self.executed_lines.append(lineno)
@@ -140,7 +143,7 @@ class Communicator(object):
             else:
                 assigned += ',' + a
         if result is not None:
-            print assigned + '=' + result
+            # print assigned + '=' + result
             self.executed_code[self.call]['result'] = assigned + '=' + result
         self.executed_code[self.call]['assigned'] = True
         self.call += 1
@@ -193,11 +196,18 @@ class Communicator(object):
             self.executed_code[self.call]['values'] = {}
 
     def evaluate_expressions(self, data, lineno):
+        self.add_call_point(lineno)
         final_expression = None
         if 'expressions' in data[lineno]:
             self.setup_executed_code(lineno)
             final_expression = self.evaluate(data[lineno]['expressions'],
                                              False)
+        if 'additional_lines' in data[lineno]:
+            self.additional_lines_call_point[lineno] = {}
+            for func in data[lineno]['additional_lines']:
+                if func in data['function_lines']:
+                    # print '\t\t\tTEST: {0}:{1} from {2}'.format(lineno, data['function_lines'][func], func)
+                    self.looking_for.append((lineno, data['function_lines'][func][:]))
         return final_expression
 
     def evaluate_targets(self, data, lineno):
@@ -219,6 +229,12 @@ class Communicator(object):
             else:
                 final_expression = result
         return final_expression
+
+    def add_call_point(self, lineno):
+        for t in self.looking_for:
+            if lineno in t[1]:
+                self.additional_lines_call_point[t[0]][lineno] = self.call
+                t[1].remove(lineno)
 
 
 def launch_child(fd_write, fd_read, file):
@@ -245,15 +261,15 @@ def main(file, input_field=None, input_event=None, user_inputs=None):
     # print communicator.executed_lines
     print communicator.executed_code
     for key, value in communicator.executed_code.iteritems():
-        print '{0}: Lineno: {1}'.format(key, value['lineno'])
+        # print '{0}: Lineno: {1}'.format(key, value['lineno'])
         if 'result' in value:
             value['result'] = value['result'].rstrip('\n(Pdb) ')
-            print 'Result: {0}'.format(value['result'])
-        print 'Values:'
+            # print 'Result: {0}'.format(value['result'])
+        # print 'Values:'
         for k, v in value['values'].iteritems():
             v = v.rstrip('\n(Pdb) ')
             value['values'][k] = v
-            print '\t{0}: {1}'.format(k, v)
+            # print '\t{0}: {1}'.format(k, v)
     return communicator
 
 if __name__ == '__main__':

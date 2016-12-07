@@ -17,3 +17,4 @@ d = 8
 mult(c, sum(a,b))
 a = [0, 1, 2, 3] # No Output
 print a
+print len(a)

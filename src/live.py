@@ -18,12 +18,17 @@ FILE_NAME = 'user_code.py'
 scale_size = 0
 prev_scale_setting = 0
 executed_code = None
+data = None
 communicationThread = None
 input_event = threading.Event()
+highlight_map = {}
+additional_lines_call_point = None
 
 
 def display_executed_code(executed_code, code_box, executed_code_box,
                           variable_box, output_box, total):
+    global highlight_map
+    highlight_map = {}
     display_map = {}
     tab_count = 0
     for key, value in executed_code.iteritems():
@@ -44,35 +49,54 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                         display_line += ', '
                     display_line += '{0}={1}'.format(k, v)
         total -= 1
+        # Get correct tab length
         tabs = ''
         for i in range(tab_count):
             tabs += '  '
+        current_length = 0
+        if key not in highlight_map:  # Setup highlight map key
+            highlight_map[key] = {}
         if value['lineno'] in display_map:
+            # Display executed code at the correct indentation
             current_length = len(display_map[value['lineno']])
             if current_length >= len(tabs):
                 tab_count += 2
                 tabs += '    '
             display_map[value['lineno']] += tabs[current_length:] + \
                 display_line
+            # Mark lines start point
+            highlight_map[key]['start'] = current_length + len(tabs[current_length:])
         else:
+            # Display executed code at the correct indentation
             display_map[value['lineno']] = tabs + display_line
+            # Mark lines start point
+            highlight_map[key]['start'] = current_length + len(tabs)
+        highlight_map[key]['lineno'] = value['lineno']
+        highlight_map[key]['end'] = len(display_map[value['lineno']])
         tab_count += 1
+
     for key, value in display_map.iteritems():
         executed_code_box.insert(float(key), value)
-        print 'key: {0} value: {1}'.format(key, value)
-        executed_code_box.tag_add('line{0}'.format(key),
-                                  '{0}.0'.format(key),
-                                  '{0}.{1}'.format(key, len(value)))
+    for key, value in highlight_map.iteritems():
+        executed_code_box.tag_add('call{0}'.format(key),
+                                  '{0}.{1}'.format(value['lineno'], value['start']),
+                                  '{0}.{1}'.format(value['lineno'], value['end']))
         executed_code_box.tag_bind(
-            'line{0}'.format(key),
+            'call{0}'.format(key),
             '<Enter>',
-            lambda event, x=executed_code_box, y=key, z=len(value),
-                opt=code_box: add_highlight(event, x, y, z, opt))
+            lambda event, widget=executed_code_box, lineno=value['lineno'],
+                line_start=value['start'], line_length=value['end'],
+                opt_widget=code_box: 
+                    add_highlight(event, widget, lineno, line_start,
+                                  line_length, opt_widget))
         executed_code_box.tag_bind(
-            'line{0}'.format(key),
+            'call{0}'.format(key),
             '<Leave>',
-            lambda event, x=executed_code_box, y=key, z=len(value),
-                opt=code_box: remove_highlight(event, x, y, z, opt))
+            lambda event, widget=executed_code_box, lineno=value['lineno'],
+                line_start=value['start'], line_length=value['end'],
+                opt_widget=code_box: 
+                    remove_highlight(event, widget, lineno, line_start,
+                                     line_length, opt_widget))
 
 
 def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
@@ -92,40 +116,91 @@ def highlight_code(code_box):
         code_box.mark_set('range_start', 'range_end')
 
 
-def add_highlight(event, code_box, line_count, line_length, opt=None):
-    code_box.tag_add('HIGHLIGHT','{0}.0'.format(line_count),
-                     '{0}.{1}'.format(line_count, line_length))
-    if opt is not None:
-        opt.tag_add('HIGHLIGHT','{0}.0'.format(line_count),
-                     '{0}.{1}'.format(line_count, line_length))
+def tag_add_highlight(widget, line, start, length):
+    widget.tag_add('HIGHLIGHT','{0}.{1}'.format(line, start),
+                '{0}.{1}'.format(line, length))
 
 
-def remove_highlight(event, code_box, line_count, line_length, opt=None):
-    code_box.tag_remove('HIGHLIGHT','{0}.0'.format(line_count),
-                     '{0}.{1}'.format(line_count, line_length))
-    if opt is not None:
-        opt.tag_remove('HIGHLIGHT','{0}.0'.format(line_count),
-                     '{0}.{1}'.format(line_count, line_length))
+def tag_remove_highlight(widget, line, start, length):
+    widget.tag_remove('HIGHLIGHT','{0}.{1}'.format(line, start),
+                      '{0}.{1}'.format(line, length))
+
+
+def optional_add_highlights(widget, lineno, line_start, line_length,
+                            lines=None):
+    tag_add_highlight(widget, lineno, 0, 'end')
+    if lines is not None:
+        for line in lines:
+            if line in additional_lines_call_point[lineno]:
+                call = additional_lines_call_point[lineno][line]
+                start = highlight_map[call]['start']
+                end = highlight_map[call]['end']
+                tag_add_highlight(widget, line, start, end)
+            else:
+                tag_add_highlight(widget, line, 0, line_length)
+
+
+def optional_remove_highlights(widget, lineno, line_start, line_length,
+                               lines=None):
+    tag_remove_highlight(widget, lineno, 0, 'end')
+    if lines is not None:
+        for line in lines:
+            if line in additional_lines_call_point[lineno]:
+                call = additional_lines_call_point[lineno][line]
+                start = highlight_map[call]['start']
+                end = highlight_map[call]['end']
+                tag_remove_highlight(widget, line, start, end)
+            else:
+                tag_remove_highlight(widget, line, 0, line_length)
+
+
+def add_highlight(event, widget, lineno, line_start, line_length, 
+                  opt_widget=None, lines=None):
+    tag_add_highlight(widget, lineno, line_start, line_length)
+    if opt_widget is not None:
+        optional_add_highlights(opt_widget, lineno, line_start, line_length,
+                                lines)
+
+
+def remove_highlight(event, widget, lineno, line_start, line_length,
+                     opt_widget=None, lines=None):
+    tag_remove_highlight(widget, lineno, line_start, line_length)
+    if opt_widget is not None:
+        optional_remove_highlights(opt_widget, lineno, line_start, line_length,
+                                   lines)
 
 
 def tag_lines(code_box, executed_code_box):
-    data = code_box.get('0.0', 'end-1c')
-    lines = str(data).split('\n')
+    global data
+    user_code = code_box.get('0.0', 'end-1c')
+    lines = str(user_code).split('\n')
     line_count = 1
     for line in lines:
         code_box.tag_add('line{0}'.format(line_count),
                          '{0}.0'.format(line_count),
                          '{0}.{1}'.format(line_count, len(line)))
+        additional_lines = []
+        if data is not None and line_count in data and 'additional_lines' in data[line_count]:
+            for func in data[line_count]['additional_lines']:
+                if func in data['function_lines']:
+                    for func_line in data['function_lines'][func]:
+                        additional_lines.append(func_line)
+
         code_box.tag_bind(
             'line{0}'.format(line_count),
             '<Enter>',
-            lambda event, x=code_box, y=line_count, z=len(line),
-                opt=executed_code_box: add_highlight(event, x, y, z, opt))
+            lambda event, widget=code_box, lineno=line_count,
+                line_length=len(line), opt_widget=executed_code_box, 
+                lines=additional_lines: add_highlight(
+                    event, widget, lineno, 0, line_length, opt_widget, lines))
         code_box.tag_bind(
             'line{0}'.format(line_count),
             '<Leave>',
-            lambda event, x=code_box, y=line_count, z=len(line),
-                opt=executed_code_box: remove_highlight(event, x, y, z, opt))
+            lambda event, widget=code_box, lineno=line_count,
+                line_length=len(line), opt_widget=executed_code_box, 
+                lines=additional_lines: remove_highlight(
+                    event, widget, lineno, 0, line_length, opt_widget, lines))
+
         line_count += 1
 
 
@@ -137,11 +212,15 @@ class CommunicationThread(threading.Thread):
 
     def run(self):
         global executed_code
+        global data
         global input_event
         global user_inputs
+        global additional_lines_call_point
         communicator = Communicate.main(self.filename, self.input_field,
                                         input_event, user_inputs)
-        executed_code = communicator.executed_code        
+        executed_code = communicator.executed_code
+        data = communicator.data
+        additional_lines_call_point = communicator.additional_lines_call_point
 
 
 def check_input_box(input_box):
@@ -201,6 +280,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         communicationThread = None
         reset_boxes(new_user_code, executed_code_box, variable_box,
                     output_box)
+        tag_lines(from_box, executed_code_box)
         scale.config(to=len(executed_code))
         scale.set(len(executed_code))
         scale_size = len(executed_code)

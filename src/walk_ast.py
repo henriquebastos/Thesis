@@ -31,6 +31,7 @@ class WalkAST(ast.NodeVisitor):
         self.is_bin_op = False
         self.get_names = False
         self.lineno = None
+        self.function_name = None
 
     def print_map(self):
         self.remove_empty_expressions()
@@ -78,6 +79,7 @@ class WalkAST(ast.NodeVisitor):
         print '{0}: FunctionDef - def {1}():'.format(node.lineno, node.name)
         utils.set_type(self.data, node.lineno, 'func')
         utils.set_name(self.data, node.lineno, node.name)
+        utils.add_function_def(self.data, node.name, node.lineno)
         arg_walker = WalkAST()
         arg_walker.lineno = node.lineno
         arg_walker.visit(node.args)
@@ -87,6 +89,7 @@ class WalkAST(ast.NodeVisitor):
                 walker = walk_ast(stmt)
                 utils.add_string_to_data(stmt.lineno, walker.data,
                                          walker.line)
+                utils.add_function_line(self.data, node.name, stmt.lineno)
                 # utils.combine_data(stmt.lineno, self.data, walker.data)
                 utils.combine_all_data(self.data, walker.data)
         # self.generic_visit(node)
@@ -407,6 +410,7 @@ class WalkAST(ast.NodeVisitor):
             first_arg = False
             self.line += arg_walker.line
         self.line += ')'
+        utils.add_additiona_lines(self.data, node.lineno, func_walker.line)
         utils.add_string_to_data(node.lineno, self.data, self.line)
 
     # Repr(expr value)
