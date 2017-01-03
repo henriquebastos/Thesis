@@ -1,19 +1,19 @@
 Module(
    body=[
-      Assign(
-         targets=[Name(id='dim', ctx=Store())], 
-         value=Call(
-            func=Name(id='input', ctx=Load()), 
-            args=[Str(s='Enter maze size: ')], 
-            keywords=[],
-            starargs=None, 
-            kwargs=None)), 
-      Assign(
-         targets=[Name(id='height', ctx=Store())], 
-         value=Call(
-            func=Name(id='int', ctx=Load()), 
-            args=[Name(id='dim', ctx=Load())], 
-            keywords=[], 
-            starargs=None, 
-            kwargs=None)), 
-      Print(dest=None, values=[Name(id='height', ctx=Load())], nl=True)])
+      Assign(targets=[Name(id='a', ctx=Store())], value=Num(n=2)), 
+      FunctionDef(
+         name='f', 
+         args=arguments(args=[], vararg=None, kwarg=None, defaults=[]), 
+         body=[
+            Print(dest=None, values=[Name(id='a', ctx=Load())], nl=True)], 
+         decorator_list=[]), 
+      FunctionDef(
+         name='g', 
+         args=arguments(args=[], vararg=None, kwarg=None, defaults=[]), 
+         body=[
+            Print(dest=None, values=[Name(id='a', ctx=Load())], nl=True), 
+            Assign(targets=[Name(id='a', ctx=Store())], value=Num(n=3))], 
+         decorator_list=[]), 
+      Expr(value=Call(func=Name(id='f', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=None)), 
+      Expr(value=Call(func=Name(id='g', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=None)), 
+      Print(dest=None, values=[Name(id='a', ctx=Load())], nl=True)])

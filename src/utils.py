@@ -121,3 +121,13 @@ def add_additiona_lines(data, lineno, func_name):
         data[lineno]['additional_lines'].append(func_name)
         # for line in data['function_lines'][func_name]:
         #     data[lineno]['additional_lines'].append(line)
+
+
+def combine_variable_scopes(target_scope, from_scope):
+    for key,value in from_scope.items():
+        if key not in target_scope:
+            target_scope[key] = value
+        else:
+            for variable in value:
+                if variable not in target_scope[key]:
+                    target_scope[key].append(variable)

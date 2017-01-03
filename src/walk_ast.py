@@ -3,21 +3,21 @@ import ast
 import utils
 
 
-def walk_ast(node):
-    walker = WalkAST()
+def walk_ast(node, current_scope):
+    walker = WalkAST(current_scope)
     walker.visit(node)
     return walker
 
 
-def walk_ast_for_names(node):
-    walker = WalkAST()
+def walk_ast_for_names(node, current_scope):
+    walker = WalkAST(current_scope)
     walker.get_names = True
     walker.visit(node)
     return walker
 
 
-def walk_ast_for_expr(node):
-    walker = WalkAST()
+def walk_ast_for_expr(node, current_scope):
+    walker = WalkAST(current_scope)
     walker.is_bin_op = True
     walker.visit(node)
     return walker
@@ -25,8 +25,12 @@ def walk_ast_for_expr(node):
 
 class WalkAST(ast.NodeVisitor):
 
-    def __init__(self):
+    def __init__(self, current_scope=None):
         self.data = {}
+        self.variable_scope = {'global': []}
+        self.current_scope = 'global'
+        if current_scope is not None:
+            self.current_scope = current_scope
         self.line = ''
         self.is_bin_op = False
         self.get_names = False
@@ -80,18 +84,21 @@ class WalkAST(ast.NodeVisitor):
         utils.set_type(self.data, node.lineno, 'func')
         utils.set_name(self.data, node.lineno, node.name)
         utils.add_function_def(self.data, node.name, node.lineno)
-        arg_walker = WalkAST()
+        self.variable_scope[node.name] = []
+        arg_walker = WalkAST(node.name)
         arg_walker.lineno = node.lineno
         arg_walker.visit(node.args)
         utils.combine_data(node.lineno, self.data, arg_walker.data)
+        utils.combine_variable_scopes(self.variable_scope, arg_walker.variable_scope)
         for stmts in [node.body, node.decorator_list]:
             for stmt in stmts:
-                walker = walk_ast(stmt)
+                walker = walk_ast(stmt, node.name)
                 utils.add_string_to_data(stmt.lineno, walker.data,
                                          walker.line)
                 utils.add_function_line(self.data, node.name, stmt.lineno)
                 # utils.combine_data(stmt.lineno, self.data, walker.data)
                 utils.combine_all_data(self.data, walker.data)
+                utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
         # self.generic_visit(node)
 
     # ClassDef(identifier name, expr* bases, stmt* body, expr* decorator_list)
@@ -106,9 +113,10 @@ class WalkAST(ast.NodeVisitor):
         print '{0}: self.line +='.format(node.lineno)
         utils.set_type(self.data, node.lineno, 'return')
         if node.value is not None:
-            walker = walk_ast_for_expr(node.value)
+            walker = walk_ast_for_expr(node.value, self.current_scope)
             utils.combine_data(node.lineno, self.data, walker.data)
             utils.add_string_to_data(node.lineno, self.data, walker.line)
+            utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
 
     # Delete(expr* targets)
     def visit_Delete(self, node):
@@ -122,27 +130,33 @@ class WalkAST(ast.NodeVisitor):
         self.line = ''
         utils.set_type(self.data, node.lineno, 'assign')
         for target in node.targets:
-            target_walker = walk_ast_for_names(target)
+            target_walker = walk_ast_for_names(target, self.current_scope)
             utils.set_assign(self.data, node.lineno, target_walker.line)
             utils.set_assigned_expressions(
                 self.data, node.lineno, target_walker.line,
                 target_walker.data[node.lineno]['expressions'])
+            utils.combine_variable_scopes(self.variable_scope, target_walker.variable_scope)
             # utils.combine_data(node.lineno, self.data, target_walker.data)
-        value_walker = walk_ast_for_expr(node.value)
+        value_walker = walk_ast_for_expr(node.value, self.current_scope)
         utils.add_string_to_data(node.lineno, value_walker.data,
                                  value_walker.line)
         utils.combine_data(node.lineno, self.data, value_walker.data)
+        # TODO
+        utils.combine_variable_scopes(self.variable_scope, value_walker.variable_scope)
         # self.generic_visit(node)
 
     # AugAssign(expr target, operator op, expr value)
     def visit_AugAssign(self, node):
         print '{0}: AugAssign'.format(node.lineno)
-        target_walker = walk_ast_for_names(node.target)
+        target_walker = walk_ast_for_names(node.target, self.current_scope)
         utils.add_string_to_data(node.lineno, target_walker.data,
                                  target_walker.line)
         utils.combine_data(node.lineno, self.data, target_walker.data)
-        op_walker = walk_ast_for_expr(node.op)
-        value_walker = walk_ast_for_expr(node.value)
+        utils.combine_variable_scopes(self.variable_scope, target_walker.variable_scope)
+        op_walker = walk_ast_for_expr(node.op, self.current_scope)
+        utils.combine_variable_scopes(self.variable_scope, op_walker.variable_scope)
+        value_walker = walk_ast_for_expr(node.value, self.current_scope)
+        utils.combine_variable_scopes(self.variable_scope, value_walker.variable_scope)
         utils.add_string_to_data(node.lineno, value_walker.data,
                                  value_walker.line)
         utils.combine_data(node.lineno, self.data, value_walker.data)
@@ -159,62 +173,71 @@ class WalkAST(ast.NodeVisitor):
         print 'Has New Line: {0}'.format(node.nl)
         utils.set_type(self.data, node.lineno, 'print')
         for value in node.values:
-            walker = walk_ast_for_names(value)
+            # walker = walk_ast_for_names(value)
+            walker = walk_ast_for_expr(value, self.current_scope)
             utils.add_string_to_data(node.lineno, walker.data, walker.line)
             utils.combine_data(node.lineno, self.data, walker.data)
+            utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
         self.generic_visit(node)
 
     # For(expr target, expr iter, stmt* body, stmt* orelse)
     def visit_For(self, node):
         print '{0}: For'.format(node.lineno)
-        target_walker = walk_ast_for_names(node.target)
+        target_walker = walk_ast_for_names(node.target, self.current_scope)
         utils.add_string_to_data(node.lineno, target_walker.data,
                                  target_walker.line)
         utils.add_targets_to_data(node.lineno, self.data, target_walker.data)
-        expr_walker = walk_ast_for_names(node.iter)
+        utils.combine_variable_scopes(self.variable_scope, target_walker.variable_scope)
+        expr_walker = walk_ast_for_names(node.iter, self.current_scope)
         utils.add_string_to_data(node.lineno, expr_walker.data,
                                  expr_walker.line)
         utils.combine_data(node.lineno, self.data, expr_walker.data)
+        utils.combine_variable_scopes(self.variable_scope, expr_walker.variable_scope)
         for stmts in [node.body, node.orelse]:
             for stmt in stmts:
-                walker = walk_ast(stmt)
+                walker = walk_ast(stmt, self.current_scope)
                 utils.add_string_to_data(stmt.lineno, walker.data,
                                          walker.line)
                 # utils.combine_data(stmt.lineno, self.data, walker.data)
                 utils.combine_all_data(self.data, walker.data)
+                utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
         utils.set_type(self.data, node.lineno, 'loop')
 
     # While(expr test, stmt* body, stmt* orelse)
     def visit_While(self, node):
         print '{0}: While'.format(node.lineno)
-        test_walker = WalkAST()
+        test_walker = WalkAST(self.current_scope)
         test_walker.get_names = True
         test_walker.visit(node.test)
         utils.add_string_to_data(node.lineno, test_walker.data,
                                  test_walker.line)
         utils.combine_data(node.lineno, self.data, test_walker.data)
+        utils.combine_variable_scopes(self.variable_scope, test_walker.variable_scope)
         for stmts in [node.body, node.orelse]:
             for stmt in stmts:
-                walker = walk_ast(stmt)
+                walker = walk_ast(stmt, self.current_scope)
                 utils.add_string_to_data(stmt.lineno, walker.data,
                                          walker.line)
                 # utils.combine_data(stmt.lineno, self.data, walker.data)
                 utils.combine_all_data(self.data, walker.data)
+                utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
         utils.set_type(self.data, node.lineno, 'loop')
 
     # If(expr test, stmt* body, stmt* orelse)
     def visit_If(self, node):
         print '{0}: Stmt If'.format(node.lineno)
         self.line = ''
-        test_walker = walk_ast_for_expr(node.test)
+        test_walker = walk_ast_for_expr(node.test, self.current_scope)
         utils.add_string_to_data(node.lineno, test_walker.data,
                                  test_walker.line)
         utils.combine_data(node.lineno, self.data, test_walker.data)
+        utils.combine_variable_scopes(self.variable_scope, test_walker.variable_scope)
         for stmts in [node.body, node.orelse]:
             for stmt in stmts:
-                walker = walk_ast(stmt)
+                walker = walk_ast(stmt, self.current_scope)
                 utils.add_string_to_data(stmt.lineno, walker.data, walker.line)
                 utils.combine_data(stmt.lineno, self.data, walker.data)
+                utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
                 utils.remove_empty_string(self.data, stmt.lineno)
         utils.set_type(self.data, node.lineno, 'conditional')
         # self.generic_visit(node)
@@ -222,18 +245,21 @@ class WalkAST(ast.NodeVisitor):
     # With(expr context_expr, expr? optional_vars, stmt* body)
     def visit_With(self, node):
         print '{0}: With'.format(node.lineno)
-        context_expr = walk_ast_for_expr(node.context_expr)
+        context_expr = walk_ast_for_expr(node.context_expr, self.current_scope)
         utils.add_string_to_data(node.lineno, context_expr.data,
                                  context_expr.line)
         utils.combine_data(node.lineno, self.data, context_expr.data)
+        utils.combine_variable_scopes(self.variable_scope, context_expr.variable_scope)
         if node.optional_vars is not None:
-            optional_vars_walker = walk_ast_for_names(node.optional_vars)
+            optional_vars_walker = walk_ast_for_names(node.optional_vars, self.current_scope)
             utils.set_type(self.data, node.lineno, 'assign')
             utils.set_assign(self.data, node.lineno, optional_vars_walker.line)
+            utils.combine_variable_scopes(self.variable_scope, optional_vars_walker.variable_scope)
         for stmt in node.body:
-                walker = walk_ast(stmt)
+                walker = walk_ast(stmt, self.current_scope)
                 utils.add_string_to_data(stmt.lineno, walker.data, walker.line)
                 utils.combine_data(stmt.lineno, self.data, walker.data)
+                utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
                 utils.remove_empty_string(self.data, stmt.lineno)
         # self.generic_visit(node)
 
@@ -286,12 +312,14 @@ class WalkAST(ast.NodeVisitor):
     # BoolOp(boolop op, expr* values)
     def visit_BoolOp(self, node):
         print '{0} BOOL_OP:'.format(node.lineno)
-        op_walker = walk_ast_for_expr(node.op)
+        op_walker = walk_ast_for_expr(node.op, self.current_scope)
+        utils.combine_variable_scopes(self.variable_scope, op_walker.variable_scope)
         first_node = True
         for n in node.values:
-            walker = walk_ast_for_expr(n)
+            walker = walk_ast_for_expr(n, self.current_scope)
             utils.add_string_to_data(node.lineno, walker.data, walker.line)
             utils.combine_data(node.lineno, self.data, walker.data)
+            utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
             if first_node:
                 first_node = False
                 self.line += walker.line
@@ -302,7 +330,7 @@ class WalkAST(ast.NodeVisitor):
 
     # BinOp(expr left, operator op, expr right)
     def visit_BinOp(self, node):
-        walker = WalkAST()
+        walker = WalkAST(self.current_scope)
         walker.is_bin_op = True
         walker.visit(node.left)
         walker.visit(node.op)
@@ -310,14 +338,17 @@ class WalkAST(ast.NodeVisitor):
         walker.line = '(' + walker.line + ')'
         utils.add_string_to_data(node.lineno, walker.data, walker.line)
         utils.combine_data(node.lineno, self.data, walker.data)
+        utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
         self.line += walker.line
         utils.add_string_to_data(node.lineno, self.data, self.line)
 
     # UnaryOp(unaryop op, expr operand)
     def visit_UnaryOp(self, node):
         print '{0}:'.format(node.lineno)
-        op_walker = walk_ast(node.op)
-        expr_walker = walk_ast_for_expr(node.operand)
+        op_walker = walk_ast(node.op, self.current_scope)
+        utils.combine_variable_scopes(self.variable_scope, op_walker.variable_scope)
+        expr_walker = walk_ast_for_expr(node.operand, self.current_scope)
+        utils.combine_variable_scopes(self.variable_scope, expr_walker.variable_scope)
         print '\t' + op_walker.line + ' ' + expr_walker.line
         utils.add_string_to_data(node.lineno, expr_walker.data,
                                  expr_walker.line)
@@ -339,9 +370,10 @@ class WalkAST(ast.NodeVisitor):
     def visit_Dict(self, node):
         print '{0}: Dict'.format(node.lineno)
         for value in node.values:
-            walker = walk_ast_for_expr(value)
+            walker = walk_ast_for_expr(value, self.current_scope)
             utils.add_string_to_data(node.lineno, walker.data, walker.line)
             utils.combine_data(node.lineno, self.data, walker.data)
+            utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
 
         # self.generic_visit(node)
 
@@ -378,33 +410,38 @@ class WalkAST(ast.NodeVisitor):
     # Compare(expr left, cmpop* ops, expr* comparators)
     def visit_Compare(self, node):
         print '{0}: Compare'.format(node.lineno)
-        left_walker = walk_ast_for_names(node.left)
+        left_walker = walk_ast_for_names(node.left, self.current_scope)
         utils.add_string_to_data(node.lineno, left_walker.data,
                                  left_walker.line)
         utils.combine_data(node.lineno, self.data, left_walker.data)
+        utils.combine_variable_scopes(self.variable_scope, left_walker.variable_scope)
         self.line = left_walker.line
         for op, comparator in zip(node.ops, node.comparators):
-            op_walker = walk_ast_for_expr(op)
-            comparator_walker = walk_ast_for_expr(comparator)
+            op_walker = walk_ast_for_expr(op, self.current_scope)
+            utils.combine_variable_scopes(self.variable_scope, op_walker.variable_scope)
+            comparator_walker = walk_ast_for_expr(comparator, self.current_scope)
             utils.add_string_to_data(node.lineno, comparator_walker.data,
                                      comparator_walker.line)
             utils.combine_data(node.lineno, self.data, comparator_walker.data)
+            utils.combine_variable_scopes(self.variable_scope, comparator_walker.variable_scope)
             self.line += op_walker.line + comparator_walker.line
 
     # Call(expr func, expr* args, keyword* keywords,
     #      expr? starargs, expr? kwargs)
     def visit_Call(self, node):
         print '{0}: Call'.format(node.lineno)
-        func_walker = walk_ast_for_names(node.func)
+        func_walker = walk_ast_for_names(node.func, self.current_scope)
         if not isinstance(node.func, ast.Name):
             utils.combine_data(node.lineno, self.data, func_walker.data)
+            utils.combine_variable_scopes(self.variable_scope, func_walker.variable_scope)
         self.line = func_walker.line + '('
         first_arg = True
         for arg in node.args:
-            arg_walker = walk_ast_for_expr(arg)
+            arg_walker = walk_ast_for_expr(arg, self.current_scope)
             utils.add_string_to_data(node.lineno, arg_walker.data,
                                      arg_walker.line)
             utils.combine_data(node.lineno, self.data, arg_walker.data)
+            utils.combine_variable_scopes(self.variable_scope, arg_walker.variable_scope)
             if not first_arg:
                 self.line += ','
             first_arg = False
@@ -432,24 +469,27 @@ class WalkAST(ast.NodeVisitor):
     # Attribute(expr value, identifier attr, expr_context ctx)
     def visit_Attribute(self, node):
         print '{0}: Attribute attr: {1}'.format(node.lineno, node.attr)
-        walker = walk_ast_for_expr(node.value)
+        walker = walk_ast_for_expr(node.value, self.current_scope)
         utils.combine_data(node.lineno, self.data, walker.data)
+        utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
         self.line += walker.line + '.' + node.attr
         utils.add_string_to_data(node.lineno, self.data, walker.line)
 
     # Subscript(expr value, slice slice, expr_context ctx)
     def visit_Subscript(self, node):
         print '{0}: Subscript'.format(node.lineno)
-        value_walker = walk_ast_for_names(node.value)
+        value_walker = walk_ast_for_names(node.value, self.current_scope)
         utils.add_string_to_data(node.lineno, value_walker.data,
                                  value_walker.line)
         utils.combine_data(node.lineno, self.data, value_walker.data)
-        slice_walker = WalkAST()
+        utils.combine_variable_scopes(self.variable_scope, value_walker.variable_scope)
+        slice_walker = WalkAST(self.current_scope)
         slice_walker.lineno = node.lineno
         slice_walker.visit(node.slice)
         utils.add_string_to_data(node.lineno, slice_walker.data,
                                  slice_walker.line)
         utils.combine_data(node.lineno, self.data, slice_walker.data)
+        utils.combine_variable_scopes(self.variable_scope, slice_walker.variable_scope)
         self.line = '{0}[{1}]'.format(value_walker.line, slice_walker.line)
         utils.add_string_to_data(node.lineno, self.data, self.line)
 
@@ -460,6 +500,10 @@ class WalkAST(ast.NodeVisitor):
                 self.get_names:
             utils.add_string_to_data(node.lineno, self.data, node.id)
             self.line += node.id
+        if self.current_scope not in self.variable_scope:
+            self.variable_scope[self.current_scope] = []
+        if node.id not in self.variable_scope[self.current_scope]:
+            self.variable_scope[self.current_scope].append(node.id)
         self.generic_visit(node)
 
     # List(expr* elts, expr_context ctx)
@@ -471,12 +515,15 @@ class WalkAST(ast.NodeVisitor):
             utils.add_string_to_data(node.lineno, self.data, '[]')
         else:
             for e in node.elts:
-                walker = walk_ast_for_names(e)
+                # walker = walk_ast_for_names(e)
+                walker = walk_ast_for_expr(e, self.current_scope)
                 utils.add_string_to_data(node.lineno, walker.data, walker.line)
                 utils.combine_data(node.lineno, self.data, walker.data)
+                utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
                 # utils.add_string_to_data(node.lineno, self.data, self.line)
         self.generic_visit(node.ctx)
         print self.data[node.lineno]['expressions']
+        self.data[node.lineno]['type'] = 'list_assign'
         utils.remove_empty_string(self.data, node.lineno)
         # self.generic_visit(node)
 
@@ -484,9 +531,10 @@ class WalkAST(ast.NodeVisitor):
     def visit_Tuple(self, node):
         print '{0}: Tuple'.format(node.lineno)
         for elt in node.elts:
-            walker = walk_ast_for_names(elt)
+            walker = walk_ast_for_names(elt, self.current_scope)
             utils.add_string_to_data(node.lineno, walker.data, walker.line)
             utils.combine_data(node.lineno, self.data, walker.data)
+            utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
         # self.generic_visit(node)
 
     #
@@ -537,10 +585,11 @@ class WalkAST(ast.NodeVisitor):
     # Index(expr value)
     def visit_Index(self, node):
         print 'Index'
-        walker = walk_ast_for_expr(node.value)
+        walker = walk_ast_for_expr(node.value, self.current_scope)
         self.line = walker.line
         utils.add_string_to_data(self.lineno, walker.data, walker.line)
         utils.combine_data(self.lineno, self.data, walker.data)
+        utils.combine_variable_scopes(self.variable_scope, walker.variable_scope)
 
     #
     # boolop
@@ -684,10 +733,11 @@ class WalkAST(ast.NodeVisitor):
             utils.setup_expressions(self.data, self.lineno)
         else:
             for arg in node.args:
-                arg_walker = walk_ast_for_names(arg)
+                arg_walker = walk_ast_for_names(arg, self.current_scope)
                 utils.add_string_to_data(self.lineno, arg_walker.data,
                                          arg_walker.line)
                 utils.combine_data(self.lineno, self.data, arg_walker.data)
+                utils.combine_variable_scopes(self.variable_scope, arg_walker.variable_scope)
         # self.generic_visit(node)
 
     # keyword = (identifier arg, expr value)
@@ -704,8 +754,8 @@ class WalkAST(ast.NodeVisitor):
 if __name__ == '__main__':
     # file = '../test_code/code.py'
     # file = '../test_code/test_code.py'
-    # file = 'user_code.py'
-    file = '../test_code/input_debug_test.py'
+    file = 'user_code.py'
+    # file = '../test_code/input_debug_test.py'
     with open(file, 'r') as myfile:
         source_code = myfile.read()
     tree = ast.parse(source_code)
@@ -713,3 +763,4 @@ if __name__ == '__main__':
     walker = WalkAST()
     walker.visit(tree)
     walker.print_map()
+    print walker.variable_scope

@@ -16,7 +16,7 @@ def get_expressions(file):
     walker.visit(tree)
     walker.print_map()
     walker.remove_empty_expressions()
-    return walker.data
+    return walker.data, walker.variable_scope
 
 
 def has_user_input_call(data, lineno):
@@ -39,6 +39,7 @@ class Communicator(object):
         self.user_inputs = None
         self.user_inputs_index = 0
         self.data = None
+        self.variable_scope = None
         self.additional_lines_call_point = {}
         self.looking_for = []
 
@@ -49,7 +50,7 @@ class Communicator(object):
         self.input_field = input_field
         self.input_event = input_event
         self.user_inputs = user_inputs
-        self.data = get_expressions(file)
+        self.data, self.variable_scope = get_expressions(file)
         lineno = 0
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
@@ -88,6 +89,8 @@ class Communicator(object):
                     if data[previous_lineno]['type'] == 'loop':
                         self.evaluate_loop_after(data, previous_lineno)
                     else:
+                        self.should_execute_previous = False
+                        self.call += 1
                         self.evaluate_expressions(data, previous_lineno)
             if 'type' in data[lineno]:
                 if data[lineno]['type'] == 'assign':
@@ -100,6 +103,8 @@ class Communicator(object):
                     self.evaluate_delete(data, lineno)
                 elif data[lineno]['type'] == 'func':
                     self.evaluate_func(data, lineno)
+                elif data[lineno]['type'] == 'list_assign':
+                    self.evaluate_list_assign(data, lineno)
                 elif data[lineno]['type'] == 'loop':
                     self.evaluate_loop(data, lineno)
                 elif data[lineno]['type'] == 'print':
@@ -165,6 +170,19 @@ class Communicator(object):
         result = self.evaluate_expressions(data, lineno)
         self.call += 1
 
+    def evaluate_list_assign(self, data, lineno):
+        result = self.evaluate_and_store_expressions(data, lineno)
+        assigned = None
+        for a in data[lineno]['assigned']:
+            if assigned is None:
+                assigned = a
+            else:
+                assigned += ',' + a
+        if result is not None:
+            self.executed_code[self.call]['result'] = assigned + '=' + result
+        self.executed_code[self.call]['assigned'] = True
+        self.call += 1
+
     def evaluate_loop(self, data, lineno):
         result = self.evaluate_expressions(data, lineno)
         self.executed_code[self.call]['result'] = result
@@ -210,6 +228,15 @@ class Communicator(object):
                     self.looking_for.append((lineno, data['function_lines'][func][:]))
         return final_expression
 
+    def evaluate_and_store_expressions(self, data, lineno):
+        self.add_call_point(lineno)
+        result = ''
+        if 'expressions' in data[lineno]:
+            self.setup_executed_code(lineno)
+            result = self.evaluate(data[lineno]['expressions'], True)
+        print '\t\t{0}'.format(result)
+        return '[' + result + ']'
+
     def evaluate_targets(self, data, lineno):
         if 'targets' in data[lineno]:
             self.setup_executed_code(lineno)
@@ -222,6 +249,8 @@ class Communicator(object):
             result = os.read(self.fd_read, 1000)
             self.executed_code[self.call]['values'][item] = result
             if add_all:
+                if '\n(Pdb) ' in result:
+                    result = result.rstrip('\n(Pdb) ')
                 if final_expression is None:
                     final_expression = result
                 else:
@@ -259,7 +288,7 @@ def main(file, input_field=None, input_event=None, user_inputs=None):
         launch_child(debugger_write, communicator_read, file)
     os.kill(pid, signal.SIGKILL)
     # print communicator.executed_lines
-    print communicator.executed_code
+    # print communicator.executed_code
     for key, value in communicator.executed_code.iteritems():
         # print '{0}: Lineno: {1}'.format(key, value['lineno'])
         if 'result' in value:
@@ -273,6 +302,6 @@ def main(file, input_field=None, input_event=None, user_inputs=None):
     return communicator
 
 if __name__ == '__main__':
-    # main('../test_code/test_code.py')
+    main('../test_code/code.py')
     # main('user_code.py')
-    main('../test_code/input_debug_test.py')
+    # main('../test_code/input_debug_test.py')

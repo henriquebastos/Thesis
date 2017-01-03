@@ -19,10 +19,53 @@ scale_size = 0
 prev_scale_setting = 0
 executed_code = None
 data = None
+variable_scope = None
+variable_values = {}
 communicationThread = None
 input_event = threading.Event()
 highlight_map = {}
 additional_lines_call_point = None
+scroll_position = None
+
+
+def get_function_call_lineno(call, lineno):
+    for line, values in additional_lines_call_point.iteritems():
+        for additional_line, additional_call in values.iteritems():
+            if lineno == additional_line and call == additional_call:
+                return line
+
+
+def display_variables(variable_box):
+    global variable_scope
+    global variable_values
+    variable_box.delete(0.0, END)
+    for func,variables in variable_scope.items():
+        variables_line = ''
+        for variable in variables:
+            if func in variable_values and variable in variable_values[func]:
+                variables_line += '{0}={1}\n'.format(variable, variable_values[func][variable])
+        if variables_line != '':
+            variable_box.insert(INSERT, '{0}:\n'.format(func))
+            variable_box.insert(INSERT, '------------------------------\n')
+            variable_box.insert(INSERT, variables_line)
+            variable_box.insert(INSERT, '\n')
+
+
+def get_scope(lineno):
+    global data
+    if 'function_lines' in data:
+        for func,lines in data['function_lines'].items():
+            for line in lines:
+                if lineno == line:
+                    return func
+    return 'global'
+
+
+def set_variable_value(scope, variable, result):
+    global variable_values
+    if scope not in variable_values:
+        variable_values[scope] = {}
+    variable_values[scope][variable] = result
 
 
 def display_executed_code(executed_code, code_box, executed_code_box,
@@ -31,23 +74,32 @@ def display_executed_code(executed_code, code_box, executed_code_box,
     highlight_map = {}
     display_map = {}
     tab_count = 0
+    # print 'THIS'
+    # print executed_code
+    # print
     for key, value in executed_code.iteritems():
         display_line = ''
         if total >= 0:
             if 'result' in value:
                 display_line += '{0}'.format(value['result'])
                 if 'assigned' in value:
-                    variable_box.insert(INSERT, value['result'] + '\n')
+                    scope = get_scope(value['lineno'])
+                    variable = value['result'].split('=')[0]
+                    result = value['result'].split('=')[1]
+                    set_variable_value(scope, variable, result)
                 if 'print' in value:
                     output_box.insert(INSERT, value['result'] + '\n')
             else:
                 no_comma = True
+                scope = get_scope(value['lineno'])
                 for k, v in value['values'].iteritems():
                     if no_comma:
                         no_comma = False
                     else:
                         display_line += ', '
                     display_line += '{0}={1}'.format(k, v)
+                    set_variable_value(scope, k, v)
+            display_variables(variable_box)
         total -= 1
         # Get correct tab length
         tabs = ''
@@ -77,7 +129,12 @@ def display_executed_code(executed_code, code_box, executed_code_box,
 
     for key, value in display_map.iteritems():
         executed_code_box.insert(float(key), value)
+
     for key, value in highlight_map.iteritems():
+        calling_lines = []
+        calling_line = get_function_call_lineno(key, value['lineno'])
+        if calling_line is not None:
+            calling_lines.append(calling_line)
         executed_code_box.tag_add('call{0}'.format(key),
                                   '{0}.{1}'.format(value['lineno'], value['start']),
                                   '{0}.{1}'.format(value['lineno'], value['end']))
@@ -86,23 +143,25 @@ def display_executed_code(executed_code, code_box, executed_code_box,
             '<Enter>',
             lambda event, widget=executed_code_box, lineno=value['lineno'],
                 line_start=value['start'], line_length=value['end'],
-                opt_widget=code_box: 
+                opt_widget=code_box, lines=calling_lines: 
                     add_highlight(event, widget, lineno, line_start,
-                                  line_length, opt_widget))
+                                  line_length, opt_widget, lines))
         executed_code_box.tag_bind(
             'call{0}'.format(key),
             '<Leave>',
             lambda event, widget=executed_code_box, lineno=value['lineno'],
                 line_start=value['start'], line_length=value['end'],
-                opt_widget=code_box: 
+                opt_widget=code_box, lines=calling_lines: 
                     remove_highlight(event, widget, lineno, line_start,
-                                     line_length, opt_widget))
+                                     line_length, opt_widget, lines))
 
 
 def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
+    global variable_values
     executed_code_box.delete(0.0, END)
     variable_box.delete(0.0, END)
     output_box.delete(0.0, END)
+    variable_values = {}
     for i in range(len(new_user_code.split('\n'))):
         executed_code_box.insert(float(i), '\n')
 
@@ -131,13 +190,15 @@ def optional_add_highlights(widget, lineno, line_start, line_length,
     tag_add_highlight(widget, lineno, 0, 'end')
     if lines is not None:
         for line in lines:
-            if line in additional_lines_call_point[lineno]:
+            if (lineno in additional_lines_call_point and
+                    line in additional_lines_call_point[lineno]):
                 call = additional_lines_call_point[lineno][line]
-                start = highlight_map[call]['start']
-                end = highlight_map[call]['end']
-                tag_add_highlight(widget, line, start, end)
+                if call in highlight_map:
+                    start = highlight_map[call]['start']
+                    end = highlight_map[call]['end']
+                    tag_add_highlight(widget, line, start, end)
             else:
-                tag_add_highlight(widget, line, 0, line_length)
+                tag_add_highlight(widget, line, 0, 'end')
 
 
 def optional_remove_highlights(widget, lineno, line_start, line_length,
@@ -145,13 +206,15 @@ def optional_remove_highlights(widget, lineno, line_start, line_length,
     tag_remove_highlight(widget, lineno, 0, 'end')
     if lines is not None:
         for line in lines:
-            if line in additional_lines_call_point[lineno]:
+            if (lineno in additional_lines_call_point and
+                    line in additional_lines_call_point[lineno]):
                 call = additional_lines_call_point[lineno][line]
-                start = highlight_map[call]['start']
-                end = highlight_map[call]['end']
-                tag_remove_highlight(widget, line, start, end)
+                if call in highlight_map:
+                    start = highlight_map[call]['start']
+                    end = highlight_map[call]['end']
+                    tag_remove_highlight(widget, line, start, end)
             else:
-                tag_remove_highlight(widget, line, 0, line_length)
+                tag_remove_highlight(widget, line, 0, 'end')
 
 
 def add_highlight(event, widget, lineno, line_start, line_length, 
@@ -213,6 +276,7 @@ class CommunicationThread(threading.Thread):
     def run(self):
         global executed_code
         global data
+        global variable_scope
         global input_event
         global user_inputs
         global additional_lines_call_point
@@ -220,6 +284,7 @@ class CommunicationThread(threading.Thread):
                                         input_event, user_inputs)
         executed_code = communicator.executed_code
         data = communicator.data
+        variable_scope = communicator.variable_scope
         additional_lines_call_point = communicator.additional_lines_call_point
 
 
@@ -248,16 +313,19 @@ def check_input_box(input_box):
 
 
 def debug_loop(from_box, executed_code_box, input_box, variable_box,
-               output_box, scale, input_field):
+               output_box, scale, input_field, scrolled_text_pair):
     global user_code
     global scale_size
     global executed_code
     global prev_scale_setting
     global communicationThread
     global input_event
+    global scroll_position
     new_user_code = from_box.get(0.0, END)[:-1]
 
     if user_code != new_user_code:
+        scroll_position = scrolled_text_pair.scrollbar.get()
+        scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
         highlight_code(from_box)
         tag_lines(from_box, executed_code_box)
         user_code = new_user_code
@@ -287,6 +355,10 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         prev_scale_setting = scale_size
         display_executed_code(executed_code, from_box, executed_code_box,
                               variable_box, output_box, scale_size)
+        if scroll_position is not None:
+            scrolled_text_pair.right.configure(yscrollcommand=scrolled_text_pair.on_textscroll)
+            scrolled_text_pair.right.yview('moveto', scroll_position[0])
+            scroll_position = None
 
     if len(input_field.get()) > 0:
         input_event.set()
@@ -295,8 +367,65 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         user_code = ''
 
     root.after(500, debug_loop, from_box, executed_code_box, input_box,
-               variable_box, output_box, scale, input_field)
+               variable_box, output_box, scale, input_field, scrolled_text_pair)
 
+
+class ScrolledTextPair(Frame):
+    # http://stackoverflow.com/questions/32038701/python-tkinter-making-two-text-widgets-scrolling-synchronize
+    '''Two Text widgets and a Scrollbar in a Frame'''
+
+    def __init__(self, master, **kwargs):
+        Frame.__init__(self, master) # no need for super
+        # Different default width
+        # if 'width' not in kwargs:
+        #     kwargs['width'] = 30
+        # Creating the widgets
+        self.left = Text(self, foreground='white',
+                                   background='gray15')
+        self.left.tag_configure('Token.Keyword', foreground='red')
+        self.left.tag_configure('Token.Operator', foreground='red')
+        self.left.tag_configure('Token.Name.Function', foreground='green')
+        self.left.tag_configure('Token.Literal.Number.Integer',
+                               foreground='purple')
+        self.left.tag_configure('Token.Name.Builtin', foreground='cyan')
+        self.left.tag_configure('Token.Literal.String.Single',
+                               foreground='yellow')
+        self.left.tag_configure('HIGHLIGHT', background='gray5')
+        if os.path.isfile(FILE_NAME):
+            with open(FILE_NAME, 'r') as code_file:
+                lines = code_file.readlines()
+                for line in lines:
+                    self.left.insert(INSERT, line)
+        self.left.pack({'side': 'left'})
+
+        self.right = Text(self, foreground='white',
+                                 background='gray15', wrap=NONE)
+        self.right.tag_configure('HIGHLIGHT', background='gray5')
+        self.right.pack({'side': 'left'})
+
+        # self.left = Text(self, **kwargs)
+        # self.left.pack(side=LEFT, fill=BOTH, expand=True)
+        # self.right = Text(self, **kwargs)
+        # self.right.pack(side=LEFT, fill=BOTH, expand=True)
+        self.scrollbar = Scrollbar(self)
+        self.scrollbar.pack(side=RIGHT, fill=Y)
+        # Changing the settings to make the scrolling work
+        self.scrollbar['command'] = self.on_scrollbar
+        self.left['yscrollcommand'] = self.on_textscroll
+        self.right['yscrollcommand'] = self.on_textscroll
+
+    def on_scrollbar(self, *args):
+        '''Scrolls both text widgets when the scrollbar is moved'''
+        # print args
+        self.left.yview(*args)
+        self.right.yview(*args)
+
+    def on_textscroll(self, *args):
+        '''Moves the scrollbar and scrolls text widgets when the mousewheel
+        is moved on a text widget'''
+        # print args
+        self.scrollbar.set(*args)
+        self.on_scrollbar('moveto', args[0])
 
 class Application(Frame):
     def get_input(self):
@@ -343,29 +472,33 @@ class Application(Frame):
         # input_button["text"] = "Enter",
         # input_button["command"] = self.get_input
         # input_button.pack(side=LEFT)
+        paired_text_boxes = ScrolledTextPair(code_frame, foreground='white', background='gray15')
+        code_box = paired_text_boxes.left
+        executed_code_box = paired_text_boxes.right
+        paired_text_boxes.pack()
 
-        code_box = ST.ScrolledText(code_frame, foreground='white',
-                                   background='gray15')
-        code_box.tag_configure('Token.Keyword', foreground='red')
-        code_box.tag_configure('Token.Operator', foreground='red')
-        code_box.tag_configure('Token.Name.Function', foreground='green')
-        code_box.tag_configure('Token.Literal.Number.Integer',
-                               foreground='purple')
-        code_box.tag_configure('Token.Name.Builtin', foreground='cyan')
-        code_box.tag_configure('Token.Literal.String.Single',
-                               foreground='yellow')
-        code_box.tag_configure('HIGHLIGHT', background='gray5')
-        if os.path.isfile(FILE_NAME):
-            with open(FILE_NAME, 'r') as code_file:
-                lines = code_file.readlines()
-                for line in lines:
-                    code_box.insert(INSERT, line)
-        code_box.pack({'side': 'left'})
+        # code_box = ST.ScrolledText(code_frame, foreground='white',
+        #                            background='gray15')
+        # code_box.tag_configure('Token.Keyword', foreground='red')
+        # code_box.tag_configure('Token.Operator', foreground='red')
+        # code_box.tag_configure('Token.Name.Function', foreground='green')
+        # code_box.tag_configure('Token.Literal.Number.Integer',
+        #                        foreground='purple')
+        # code_box.tag_configure('Token.Name.Builtin', foreground='cyan')
+        # code_box.tag_configure('Token.Literal.String.Single',
+        #                        foreground='yellow')
+        # code_box.tag_configure('HIGHLIGHT', background='gray5')
+        # if os.path.isfile(FILE_NAME):
+        #     with open(FILE_NAME, 'r') as code_file:
+        #         lines = code_file.readlines()
+        #         for line in lines:
+        #             code_box.insert(INSERT, line)
+        # code_box.pack({'side': 'left'})
 
-        executed_code_box = Text(executed_code_frame, foreground='white',
-                                 background='gray15', wrap=NONE)
-        executed_code_box.tag_configure('HIGHLIGHT', background='gray5')
-        executed_code_box.pack({'side': 'left'})
+        # executed_code_box = Text(executed_code_frame, foreground='white',
+        #                          background='gray15', wrap=NONE)
+        # executed_code_box.tag_configure('HIGHLIGHT', background='gray5')
+        # executed_code_box.pack({'side': 'left'})
 
         input_box = Text(input_frame)
         input_box.pack({'side': 'left'})
@@ -377,7 +510,7 @@ class Application(Frame):
         output_box.pack({'side': 'left'})
 
         root.after(500, debug_loop, code_box, executed_code_box, input_box,
-                   variable_box, output_box, execution_step, input_field)
+                   variable_box, output_box, execution_step, input_field, paired_text_boxes)
 
     def __init__(self, master=None):
         Frame.__init__(self, master)

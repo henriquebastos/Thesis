@@ -1,3 +1,17 @@
+a = 2
+
+def f():
+   print a
+
+def g():
+   print a
+   a = 3
+
+f()
+g()
+print a
+
+
 # def add(x, y):
 #    z = x + y + 5 * 3 + x * y
 #    return z
@@ -68,16 +82,16 @@
 #    print l[f]
 # except:
 #    raise KeyError
-d = {}
+# d = {}
 
-d['hi'] = 'hello world'
-d[a] = c*d
-d[a+10] = c*d+10
+# d['hi'] = 'hello world'
+# d[a] = c*d
+# d[a+10] = c*d+10
 
-d = {
-   'hi': 1,
-   'bye': a + b
-}
+# d = {
+#    'hi': 1,
+#    'bye': a + b
+# }
 
 # Needed for Assignment statements
 # Assignee = Result

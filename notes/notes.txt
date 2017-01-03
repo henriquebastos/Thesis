@@ -11,3 +11,33 @@ other data type visuals
 mapping executed code to code box
 validation
 scope
+
+
+
+Get mapping of function call to lines in function
+@ func Def
+   create mapping funcname --> [lines]
+   
+
+
+
+
+FOR VARIABLE SCOPE
+
+a = 2
+
+def f():
+   print a
+
+def g():
+   a = 3
+   print 3
+
+
+GLOBAL:
+a = 2
+
+f:
+a ???
+
+g: a = 3
