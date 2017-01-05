@@ -23,6 +23,7 @@ variable_scope = None
 variable_values = {}
 communicationThread = None
 input_event = threading.Event()
+rerun_event = threading.Event()
 highlight_map = {}
 additional_lines_call_point = None
 scroll_position = None
@@ -267,10 +268,10 @@ def tag_lines(code_box, executed_code_box):
 
 
 class CommunicationThread(threading.Thread):
-    def __init__(self, filename, input_field):
+    def __init__(self, filename):
         threading.Thread.__init__(self)
         self.filename = filename
-        self.input_field = input_field
+        self.stop_event = threading.Event()
 
     def run(self):
         global executed_code
@@ -279,40 +280,50 @@ class CommunicationThread(threading.Thread):
         global input_event
         global user_inputs
         global additional_lines_call_point
-        communicator = Communicate.main(self.filename, self.input_field,
+        communicator = Communicate.main(self.filename, self.stop_event,
                                         input_event, user_inputs)
-        executed_code = communicator.executed_code
-        data = communicator.data
-        variable_scope = communicator.variable_scope
-        additional_lines_call_point = communicator.additional_lines_call_point
+        if not self.stop_event.isSet():
+            executed_code = communicator.executed_code
+            data = communicator.data
+            variable_scope = communicator.variable_scope
+            additional_lines_call_point = communicator.additional_lines_call_point
+
+    def stop(self):
+        self.stop_event.set()
 
 
-def check_input_box(input_box):
+def check_for_new_input(input_box):
     global user_inputs
-    update = False
-    lines = str(input_box.get(0.0, END)[:-1])
-    if len(lines) == 0:
-        if len(user_inputs) > 0:
-            for i in user_inputs:
-                input_box.insert(INSERT, '{0}\n'.format(i))
+    # By removing the last line split, this forces the user to hit enter after
+    # each of their line inputs. Leaving an empty line at the bottom of the
+    # input box
+    lines = str(input_box.get(0.0, END)[:-1]).split('\n')[:-1]
+    if len(lines) > len(user_inputs):
+        if lines[len(user_inputs)] != '':
+            user_inputs.append(lines[len(user_inputs)])
+            input_event.set()
+
+
+def input_box_has_changes(input_box):
+    global user_inputs
+    has_changed = False
+    lines = str(input_box.get(0.0, END)[:-1]).split('\n')[:-1]
+    if len(user_inputs) > len(lines):
+        while len(user_inputs) > len(lines):
+            del user_inputs[len(user_inputs) - 1]
+        has_changed = True
     else:
-        lines = lines.split('\n')[:-1]
-        if len(user_inputs) != len(lines):
-            input_box.delete(0.0, END)
-            for i in user_inputs:
-                input_box.insert(INSERT, '{0}\n'.format(i))
-        else:
-            i = 0
-            while i < len(lines):
-                if user_inputs[i] != lines[i]:
-                    user_inputs[i] = lines[i]
-                    update = True
-                i += 1
-    return update
+        i = 0
+        while i < len(user_inputs):
+            if user_inputs[i] != lines[i]:
+                user_inputs[i] = lines[i]
+                has_changed = True
+            i += 1
+    return has_changed
 
 
 def debug_loop(from_box, executed_code_box, input_box, variable_box,
-               output_box, scale, input_field, scrolled_text_pair):
+               output_box, scale, scrolled_text_pair):
     global user_code
     global scale_size
     global executed_code
@@ -320,6 +331,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
     global communicationThread
     global input_event
     global scroll_position
+    global rerun_event
     new_user_code = from_box.get(0.0, END)[:-1]
 
     if user_code != new_user_code:
@@ -332,7 +344,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
             code_file.write(user_code)
         try:
             if communicationThread is None:
-                communicationThread = CommunicationThread('user_code.py', input_field)
+                communicationThread = CommunicationThread('user_code.py')
                 communicationThread.start()
         except:
             pass
@@ -359,14 +371,26 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
             scrolled_text_pair.right.yview('moveto', scroll_position[0])
             scroll_position = None
 
-    if len(input_field.get()) > 0:
-        input_event.set()
+    # Check for new input
+    check_for_new_input(input_box)
 
-    if check_input_box(input_box):
+    if input_box_has_changes(input_box):
+        # If a thread is running, kill the thread and set the rerun flag.
+        # Else rerun the user's code right away.
+        if communicationThread is not None and communicationThread.isAlive():
+            communicationThread.stop()
+            rerun_event.set()
+        else:
+            user_code = ''
+        input_event.clear()
+
+    # Wait for the thread to kill itself, then rerun the user's code.
+    if communicationThread is None and rerun_event.isSet():
+        rerun_event.clear()
         user_code = ''
 
     root.after(500, debug_loop, from_box, executed_code_box, input_box,
-               variable_box, output_box, scale, input_field, scrolled_text_pair)
+               variable_box, output_box, scale, scrolled_text_pair)
 
 
 class ScrolledTextPair(Frame):
@@ -461,11 +485,11 @@ class Application(Frame):
         execution_step = Scale(menu_frame, orient=HORIZONTAL)
         execution_step.pack(side=LEFT)
 
-        input_label = Label(menu_frame, text='Input')
-        input_label.pack(side=LEFT)
+        # input_label = Label(menu_frame, text='Input')
+        # input_label.pack(side=LEFT)
 
-        input_field = Entry(menu_frame)
-        input_field.pack(side=LEFT)
+        # input_field = Entry(menu_frame)
+        # input_field.pack(side=LEFT)
 
         # input_button = Button(menu_frame)
         # input_button["text"] = "Enter",
@@ -510,7 +534,7 @@ class Application(Frame):
         output_box.pack({'side': 'left'})
 
         root.after(500, debug_loop, code_box, executed_code_box, input_box,
-                   variable_box, output_box, execution_step, input_field, paired_text_boxes)
+                   variable_box, output_box, execution_step, paired_text_boxes)
 
     def __init__(self, master=None):
         Frame.__init__(self, master)

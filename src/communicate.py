@@ -34,7 +34,7 @@ class Communicator(object):
         self.executed_lines = []
         self.fd_write = None
         self.fd_read = None
-        self.input_field = None
+        self.stop_event = None
         self.input_event = None
         self.user_inputs = None
         self.user_inputs_index = 0
@@ -43,11 +43,11 @@ class Communicator(object):
         self.additional_lines_call_point = {}
         self.looking_for = []
 
-    def communicate(self, fd_write, fd_read, file, input_field=None,
+    def communicate(self, fd_write, fd_read, file, stop_event=None,
             input_event=None, user_inputs=None):
         self.fd_write = fd_write
         self.fd_read = fd_read
-        self.input_field = input_field
+        self.stop_event = stop_event
         self.input_event = input_event
         self.user_inputs = user_inputs
         self.data, self.variable_scope = get_expressions(file)
@@ -61,7 +61,7 @@ class Communicator(object):
                 lineno = 0
             self.executed_lines.append(lineno)
             os.write(self.fd_write, 's\n')
-            if self.call > 1000:  # Terminate on long loops
+            if self.call > 1000 or self.stop_event.isSet():  # Terminate on long loops
                 return
 
     def parse_line(self, line):
@@ -119,21 +119,18 @@ class Communicator(object):
     def evaluate_assign(self, data, lineno):
         if has_user_input_call(data, lineno):
             os.write(self.fd_write, 's\n')
-            if self.input_field is None:
-                print "ERROR!!! BREAK"
-                user_input = '10'
+            if (len(self.user_inputs) > 0 and
+                    self.user_inputs_index < len(self.user_inputs)):
+                user_input = self.user_inputs[self.user_inputs_index]
+                self.user_inputs_index += 1
             else:
-                if (len(self.user_inputs) > 0 and
-                        self.user_inputs_index < len(self.user_inputs)):
-                    user_input = self.user_inputs[self.user_inputs_index]
-                    self.user_inputs_index += 1
-                else:
-                    self.input_event.wait()
-                    user_input = self.input_field.get()
-                    self.user_inputs.append(user_input)
-                    self.input_field.delete(0, len(user_input))
-                    self.user_inputs_index += 1
-                    self.input_event.clear()
+                self.input_event.wait()
+                self.user_inputs_index = len(self.user_inputs) - 1 # Maybe Delete
+                user_input = self.user_inputs[self.user_inputs_index]
+                self.user_inputs_index += 1
+                self.input_event.clear()
+            if self.stop_event.isSet():
+                return
             os.write(self.fd_write, str(user_input) + '\n')
             while '--Return--' not in os.read(self.fd_read, 1000):
                 os.write(self.fd_write, 's\n')
@@ -272,7 +269,7 @@ def launch_child(fd_write, fd_read, file):
     os.execlp('python', 'Debugger', 'pdb.py', file)
 
 
-def main(file, input_field=None, input_event=None, user_inputs=None):
+def main(file, stop_event=None, input_event=None, user_inputs=None):
     communicator_read, communicator_write = os.pipe()
     debugger_read, debugger_write = os.pipe()
     pid = os.fork()
@@ -281,7 +278,7 @@ def main(file, input_field=None, input_event=None, user_inputs=None):
         os.close(debugger_write)
         communicator = Communicator()
         communicator.communicate(communicator_write, debugger_read, file,
-                                 input_field, input_event, user_inputs)
+                                 stop_event, input_event, user_inputs)
     else:  # Child
         os.close(debugger_read)
         os.close(communicator_write)
