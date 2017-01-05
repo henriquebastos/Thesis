@@ -45,8 +45,7 @@ def display_variables(variable_box):
             if func in variable_values and variable in variable_values[func]:
                 variables_line += '{0}={1}\n'.format(variable, variable_values[func][variable])
         if variables_line != '':
-            variable_box.insert(INSERT, '{0}:\n'.format(func))
-            variable_box.insert(INSERT, '------------------------------\n')
+            variable_box.insert(INSERT, '{0}:\n'.format(func), 'BOLD')
             variable_box.insert(INSERT, variables_line)
             variable_box.insert(INSERT, '\n')
 
@@ -504,6 +503,7 @@ class Application(Frame):
         input_box.pack({'side': 'left'})
 
         variable_box = Text(variable_frame)
+        variable_box.tag_configure("BOLD", font=('-weight bold'))
         variable_box.pack({'side': 'left'})
 
         output_box = Text(output_frame)

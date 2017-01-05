@@ -31,6 +31,14 @@ b = 3
 print 7
 a = 2
 test()
+user_input = input()
+print user_input
+print user_input + 1
+user_input2 = input()
+print user_input2
+
+
+
 
 
 
