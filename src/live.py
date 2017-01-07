@@ -1,4 +1,5 @@
 from Tkinter import *
+import tkFileDialog
 import os
 import ScrolledText as ST
 import threading
@@ -24,6 +25,7 @@ variable_values = {}
 communicationThread = None
 input_event = threading.Event()
 rerun_event = threading.Event()
+exit_event = threading.Event()
 highlight_map = {}
 additional_lines_call_point = None
 scroll_position = None
@@ -332,6 +334,10 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
     global input_event
     global scroll_position
     global rerun_event
+
+    if exit_event.isSet():
+        return
+
     new_user_code = from_box.get(0.0, END)[:-1]
 
     if user_code != new_user_code:
@@ -426,10 +432,6 @@ class ScrolledTextPair(Frame):
         self.right.tag_configure('HIGHLIGHT', background='gray5')
         self.right.pack({'side': 'left'})
 
-        # self.left = Text(self, **kwargs)
-        # self.left.pack(side=LEFT, fill=BOTH, expand=True)
-        # self.right = Text(self, **kwargs)
-        # self.right.pack(side=LEFT, fill=BOTH, expand=True)
         self.scrollbar = Scrollbar(self)
         self.scrollbar.pack(side=RIGHT, fill=Y)
         # Changing the settings to make the scrolling work
@@ -451,8 +453,26 @@ class ScrolledTextPair(Frame):
         self.on_scrollbar('moveto', args[0])
 
 class Application(Frame):
-    def get_input(self):
-        print "hi there, everyone!"
+    def close_all(self):
+        global communicationThread
+        exit_event.set()
+        if communicationThread is not None and communicationThread.isAlive():
+            communicationThread.stop()
+            user_inputs.append('quit')
+            input_event.set()
+            while communicationThread.isAlive():
+                print 'HERE'
+                continue
+            communicationThread = None
+        self.quit()
+
+    def open_input_file(self, input_box):
+        file = tkFileDialog.askopenfile(parent=root,mode='rb',title='Choose a file')
+        if file != None:
+            data = file.read()
+            input_box.delete(0.0, END)
+            input_box.insert(INSERT, data)
+            file.close()
 
     def createWidgets(self):
         self.bg = 'grey'
@@ -477,54 +497,22 @@ class Application(Frame):
         variable_frame.pack(side=LEFT)
         output_frame.pack(side=LEFT)
 
-        QUIT = Button(menu_frame)
-        QUIT["text"] = "QUIT"
-        QUIT["command"] = self.quit
+        QUIT = Button(master=menu_frame, text='Quit', command=self.close_all)
         QUIT.pack(side=LEFT)
 
         execution_step = Scale(menu_frame, orient=HORIZONTAL)
         execution_step.pack(side=LEFT)
 
-        # input_label = Label(menu_frame, text='Input')
-        # input_label.pack(side=LEFT)
-
-        # input_field = Entry(menu_frame)
-        # input_field.pack(side=LEFT)
-
-        # input_button = Button(menu_frame)
-        # input_button["text"] = "Enter",
-        # input_button["command"] = self.get_input
-        # input_button.pack(side=LEFT)
         paired_text_boxes = ScrolledTextPair(code_frame, foreground='white', background='gray15')
         code_box = paired_text_boxes.left
         executed_code_box = paired_text_boxes.right
         paired_text_boxes.pack()
 
-        # code_box = ST.ScrolledText(code_frame, foreground='white',
-        #                            background='gray15')
-        # code_box.tag_configure('Token.Keyword', foreground='red')
-        # code_box.tag_configure('Token.Operator', foreground='red')
-        # code_box.tag_configure('Token.Name.Function', foreground='green')
-        # code_box.tag_configure('Token.Literal.Number.Integer',
-        #                        foreground='purple')
-        # code_box.tag_configure('Token.Name.Builtin', foreground='cyan')
-        # code_box.tag_configure('Token.Literal.String.Single',
-        #                        foreground='yellow')
-        # code_box.tag_configure('HIGHLIGHT', background='gray5')
-        # if os.path.isfile(FILE_NAME):
-        #     with open(FILE_NAME, 'r') as code_file:
-        #         lines = code_file.readlines()
-        #         for line in lines:
-        #             code_box.insert(INSERT, line)
-        # code_box.pack({'side': 'left'})
-
-        # executed_code_box = Text(executed_code_frame, foreground='white',
-        #                          background='gray15', wrap=NONE)
-        # executed_code_box.tag_configure('HIGHLIGHT', background='gray5')
-        # executed_code_box.pack({'side': 'left'})
-
         input_box = Text(input_frame)
         input_box.pack({'side': 'left'})
+
+        input_button = Button(master=menu_frame, text='Input File', command= lambda: self.open_input_file(input_box))
+        input_button.pack(side=LEFT)
 
         variable_box = Text(variable_frame)
         variable_box.tag_configure("BOLD", font=('-weight bold'))
@@ -545,9 +533,3 @@ class Application(Frame):
 app = Application(master=root)
 app.mainloop()
 root.destroy()
-
-# tkFont
-# tkMessageBox
-# tkSimpleDialog
-# Tkdnd
-# TkDND

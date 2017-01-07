@@ -1,28 +1,17 @@
 folding editors
-variable scope
-
 
 loops (Solution one finish after 1000 steps, )
-input window --> Solution: Event handling. TODO add window to add input window to change previous choices
 drag/drop
 UI
 files
 other data type visuals
-mapping executed code to code box
 validation
-scope
 
 
 
-Get mapping of function call to lines in function
-@ func Def
-   create mapping funcname --> [lines]
-   
+***For paired scrolling, if the windows are different sizes from the lack of calls via the scroll bar we have issues
 
-
-
-
-FOR VARIABLE SCOPE
+***FOR VARIABLE SCOPE
 
 a = 2
 
