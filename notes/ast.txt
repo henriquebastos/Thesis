@@ -1,19 +1,54 @@
 Module(
    body=[
-      Assign(targets=[Name(id='a', ctx=Store())], value=Num(n=2)), 
-      FunctionDef(
-         name='f', 
-         args=arguments(args=[], vararg=None, kwarg=None, defaults=[]), 
+      ClassDef(
+         name='node', 
+         bases=[], 
          body=[
-            Print(dest=None, values=[Name(id='a', ctx=Load())], nl=True)], 
-         decorator_list=[]), 
-      FunctionDef(
-         name='g', 
-         args=arguments(args=[], vararg=None, kwarg=None, defaults=[]), 
-         body=[
-            Print(dest=None, values=[Name(id='a', ctx=Load())], nl=True), 
-            Assign(targets=[Name(id='a', ctx=Store())], value=Num(n=3))], 
-         decorator_list=[]), 
-      Expr(value=Call(func=Name(id='f', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=None)), 
-      Expr(value=Call(func=Name(id='g', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=None)), 
-      Print(dest=None, values=[Name(id='a', ctx=Load())], nl=True)])
+            FunctionDef(
+               name='__init__', 
+               args=arguments(args=[], vararg=None, kwarg=None, defaults=[]), 
+               body=[
+                  Assign(
+                     targets=[
+                        Attribute(
+                           value=Name(id='self', ctx=Load()), 
+                           attr='value', 
+                           ctx=Store())], 
+                     value=Name(id='None', ctx=Load())), 
+                  Assign(
+                     targets=[
+                        Attribute(
+                           value=Name(id='self', ctx=Load()), 
+                           attr='left', 
+                           ctx=Store())], 
+                     value=Name(id='None', ctx=Load())), 
+                  Assign(
+                     targets=[
+                        Attribute(value=Name(id='self', ctx=Load()), 
+                        attr='right', 
+                        ctx=Store())], 
+                     value=Name(id='None', ctx=Load()))], 
+               decorator_list=[]), 
+            FunctionDef(
+               name='set_value', 
+               args=arguments(args=[Name(id='v', ctx=Param())], vararg=None, kwarg=None, defaults=[]), 
+               body=[
+                  Assign(
+                     targets=[
+                        Attribute(
+                           value=Name(id='self', ctx=Load()), 
+                           attr='value', 
+                           ctx=Store())], 
+                     value=Name(id='v', ctx=Load()))], 
+               decorator_list=[]), 
+            FunctionDef(
+               name='get_value', 
+               args=arguments(args=[], vararg=None, kwarg=None, defaults=[]), 
+               body=[
+                  Return(
+                     value=Attribute(
+                        value=Name(id='self', ctx=Load()), 
+                        attr='value', 
+                        ctx=Load()))], 
+               decorator_list=[])], 
+         decorator_list=[])])

@@ -24,9 +24,11 @@ def combine_data(lineno, target_data, from_data):
     if 'assigned' in from_data[lineno]:
         target_data[lineno]['assigned'] = from_data[lineno]['assigned']
     if 'function_lines' in from_data[lineno]:
-            target_data[lineno]['function_lines'] = from_data[lineno]['function_lines']
+            target_data[lineno]['function_lines'] = \
+                from_data[lineno]['function_lines']
     if 'additional_lines' in from_data[lineno]:
-            target_data[lineno]['additional_lines'] = from_data[lineno]['additional_lines']
+            target_data[lineno]['additional_lines'] = \
+                from_data[lineno]['additional_lines']
 
 
 def combine_all_data(target_data, from_data):
@@ -39,9 +41,11 @@ def combine_all_data(target_data, from_data):
         if 'assigned' in from_data[lineno]:
             target_data[lineno]['assigned'] = from_data[lineno]['assigned']
         if 'function_lines' in from_data[lineno]:
-            target_data[lineno]['function_lines'] = from_data[lineno]['function_lines']
+            target_data[lineno]['function_lines'] = \
+                from_data[lineno]['function_lines']
         if 'additional_lines' in from_data[lineno]:
-            target_data[lineno]['additional_lines'] = from_data[lineno]['additional_lines']
+            target_data[lineno]['additional_lines'] = \
+                from_data[lineno]['additional_lines']
 
 
 def combine_target_data(lineno, data, from_data):
@@ -124,7 +128,7 @@ def add_additiona_lines(data, lineno, func_name):
 
 
 def combine_variable_scopes(target_scope, from_scope):
-    for key,value in from_scope.items():
+    for key, value in from_scope.items():
         if key not in target_scope:
             target_scope[key] = value
         else:

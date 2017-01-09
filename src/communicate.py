@@ -44,7 +44,7 @@ class Communicator(object):
         self.looking_for = []
 
     def communicate(self, fd_write, fd_read, file, stop_event=None,
-            input_event=None, user_inputs=None):
+                    input_event=None, user_inputs=None):
         self.fd_write = fd_write
         self.fd_read = fd_read
         self.stop_event = stop_event
@@ -61,7 +61,8 @@ class Communicator(object):
                 lineno = 0
             self.executed_lines.append(lineno)
             os.write(self.fd_write, 's\n')
-            if self.call > 1000 or self.stop_event.isSet():  # Terminate on long loops
+            # Terminate on long loops
+            if self.call > 1000 or self.stop_event.isSet():
                 return
 
     def parse_line(self, line):
@@ -125,7 +126,7 @@ class Communicator(object):
                 self.user_inputs_index += 1
             else:
                 self.input_event.wait()
-                self.user_inputs_index = len(self.user_inputs) - 1 # Maybe Delete
+                self.user_inputs_index = len(self.user_inputs) - 1  # Maybe Delete
                 user_input = self.user_inputs[self.user_inputs_index]
                 self.user_inputs_index += 1
                 self.input_event.clear()
@@ -221,8 +222,8 @@ class Communicator(object):
             self.additional_lines_call_point[lineno] = {}
             for func in data[lineno]['additional_lines']:
                 if func in data['function_lines']:
-                    # print '\t\t\tTEST: {0}:{1} from {2}'.format(lineno, data['function_lines'][func], func)
-                    self.looking_for.append((lineno, data['function_lines'][func][:]))
+                    self.looking_for.append(
+                        (lineno, data['function_lines'][func][:]))
         return final_expression
 
     def evaluate_and_store_expressions(self, data, lineno):

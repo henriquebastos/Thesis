@@ -1,15 +1,10 @@
-folding editors
-
 loops (Solution one finish after 1000 steps, )
 drag/drop
 UI
-files
 other data type visuals
+how to relate errors to the user
 validation
 
-
-
-***For paired scrolling, if the windows are different sizes from the lack of calls via the scroll bar we have issues
 
 ***FOR VARIABLE SCOPE
 
@@ -30,3 +25,7 @@ f:
 a ???
 
 g: a = 3
+
+
+*** CLASSES ***
+- class name --> class lines
