@@ -179,7 +179,6 @@ def highlight_code(code_box):
     for token, content in lex(data, PythonLexer()):
         code_box.mark_set('range_end', 'range_start + %dc' % len(content))
         code_box.tag_add(str(token), 'range_start', 'range_end')
-        print token
         code_box.mark_set('range_start', 'range_end')
 
 

@@ -1,3 +1,30 @@
+class Node():
+   def __init__(self):
+      self.value = None
+      self.left = None
+      self.right = None
+
+   def set_value(self, v):
+      self.value = v
+
+   def get_value(self):
+      return self.value
+
+n = Node()
+n.set_value(1)
+n.left = Node()
+n.left.set_value(2)
+print n.value
+print n.left.get_value()
+
+
+# print n.get_value()
+# print n.get_value()
+
+# n2 = Node()
+
+
+
 # def sum(x,y):
 #    z = x + y
 #    return z
@@ -36,22 +63,3 @@
 # print user_input + 1
 # user_input2 = input()
 # print user_input2
-
-class node():
-   def __init__():
-      self.value = None
-#       self.left = None
-#       self.right = None
-
-#    def set_value(v):
-#       self.value = v
-
-#    def get_value():
-#       return self.value
-
-
-
-
-
-
-

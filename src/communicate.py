@@ -153,7 +153,7 @@ class Communicator(object):
 
     def evaluate_class(self, data, lineno):
         result = self.evaluate_expressions(data, lineno)
-        self.executed_code[self.call]['result'] = result
+        # self.executed_code[self.call]['result'] = result
         self.call += 1
 
     def evaluate_cond(self, data, lineno):
@@ -300,6 +300,7 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
     return communicator
 
 if __name__ == '__main__':
-    main('../test_code/code.py')
+    main('../test_code/node_class.py')
+    # main('../test_code/code.py')
     # main('user_code.py')
     # main('../test_code/input_debug_test.py')
