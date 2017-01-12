@@ -65,8 +65,11 @@ def add_function_to_class(target_data, from_data, classname):
         for func, lines in from_data['function_lines'].items():
             if func not in target_data['classes'][classname]:
                 if 'functions' not in target_data['classes'][classname]:
-                    target_data['classes'][classname]['functions'] = []
-                target_data['classes'][classname]['functions'].append(func)
+                    target_data['classes'][classname]['functions'] = {}
+                target_data['classes'][classname]['functions'][func] = lines
+
+
+# TODO: remove functions from function_lines now that they are in class lines. check highlights
 
 
 def add_variables_to_class(target_data, from_variable_scope, classname):

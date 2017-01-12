@@ -220,10 +220,17 @@ class Communicator(object):
                                              False)
         if 'additional_lines' in data[lineno]:
             self.additional_lines_call_point[lineno] = {}
-            for func in data[lineno]['additional_lines']:
-                if func in data['function_lines']:
+            for name in data[lineno]['additional_lines']:
+                if '.' in name:
+                    name = name.split('.')[-1]
+
+                if name in data['function_lines']:
                     self.looking_for.append(
-                        (lineno, data['function_lines'][func][:]))
+                        (lineno, data['function_lines'][name][:]))
+                elif ('classes' in data and name in data['classes'] and 
+                        '__init__' in data['classes'][name]['functions']):
+                    self.looking_for.append(
+                        (lineno, data['classes'][name]['functions']['__init__'][:]))
         return final_expression
 
     def evaluate_and_store_expressions(self, data, lineno):

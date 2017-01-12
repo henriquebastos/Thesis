@@ -132,6 +132,9 @@ def display_executed_code(executed_code, code_box, executed_code_box,
         highlight_map[key]['end'] = len(display_map[value['lineno']])
         tab_count += 1
 
+    print '\nHIGHLIGHT_MAP: {0}'.format(highlight_map)
+    print '\nADDITIONAL_LINES_CALL_POINT: {0}'.format(additional_lines_call_point)
+
     for key, value in display_map.iteritems():
         executed_code_box.insert(float(key), value)
 
@@ -252,9 +255,16 @@ def tag_lines(code_box, executed_code_box):
         additional_lines = []
         if (data is not None and line_count in data and
                 'additional_lines' in data[line_count]):
-            for func in data[line_count]['additional_lines']:
-                if func in data['function_lines']:
-                    for func_line in data['function_lines'][func]:
+            for name in data[line_count]['additional_lines']:
+                if '.' in name:
+                    name = name.split('.')[-1]
+
+                if name in data['function_lines']:
+                    for func_line in data['function_lines'][name]:
+                        additional_lines.append(func_line)
+                elif ('classes' in data and name in data['classes'] and
+                        '__init__' in data['classes'][name]['functions']):
+                    for func_line in data['classes'][name]['functions']['__init__']:
                         additional_lines.append(func_line)
 
         code_box.tag_bind(
