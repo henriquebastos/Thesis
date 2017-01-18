@@ -6,6 +6,7 @@ class Node():
 
    def set_value(self, v):
       self.value = v
+      self.q = 8
 
    def get_value(self):
       return self.value
@@ -13,9 +14,12 @@ class Node():
 n = Node()
 n.set_value(1)
 n.left = Node()
+n2 = n.left
 n.left.set_value(2)
 print n.value
 print n.left.get_value()
+
+
 
 
 # print n.get_value()
@@ -63,3 +67,4 @@ print n.left.get_value()
 # print user_input + 1
 # user_input2 = input()
 # print user_input2
+# print a

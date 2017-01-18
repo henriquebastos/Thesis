@@ -1,5 +1,24 @@
 import Tkinter as tk
 
+class Node(tk.Canvas):
+    def __init__(self, *args, **kwargs):
+        tk.Canvas.__init__(self, *args)
+
+        self.text_box = self.create_text(0,0)
+        # Create small box
+        # Variable Section
+        # Method Section
+        # Method's Variables
+        # From lines
+        # To lines
+
+    def set_text(new_text):
+        self.text_box.delete(0.0, tk.END)
+        self.text_box.INSERT(tk.INSERT, new_text)
+
+    def get_text():
+        return self.text_box.get('0.0', 'end-1c')
+
 class SampleApp(tk.Tk):
     '''Illustrate how to drag items on a Tkinter canvas'''
 
@@ -27,14 +46,24 @@ class SampleApp(tk.Tk):
     def _create_token(self, coord, color):
         '''Create a token at the given coordinate in the given color'''
         (x,y) = coord
-        self.canvas.create_oval(x-25, y-25, x+25, y+25, 
-                                outline=color, fill=color, tags="token")
+        # node = Node()
+        # self.canvas.insert(node, tk.INSERT)
+        # self.canvas.create_oval(x-25, y-25, x+25, y+25, 
+        #                         outline=color, fill=color, tags="token")
         
-        big_oval_id = self.canvas.create_oval(x-50, y-50, x+50, y+50, outline='blue', fill='blue', tags='token')
-        self.canvas.itemconfig(big_oval_id, fill='orange')
-        self.canvas.insert(big_oval_id, tk.INSERT, 'TEST')
-        textId = self.canvas.create_text(x, y, text='Object\nx=1', tags='token')
-        self.canvas.insert(textId, tk.INSERT, 'TEST')
+        # big_oval_id = self.canvas.create_oval(x-50, y-50, x+50, y+50, outline='blue', fill='blue', tags='token')
+        # self.canvas.itemconfig(big_oval_id, fill='orange')
+        # self.canvas.insert(big_oval_id, tk.INSERT, 'TEST')
+        # textId = self.canvas.create_text(x, y, text='Object\nx=1', tags='token', borderwidth=1)
+        # self.canvas.insert(textId, tk.INSERT, 'TEST')
+        c = self.canvas.create_canvas(0, 0, tags='token')
+
+        text_item = c.create_text(0, 0, anchor="w", text="Hello world!", fill="black")
+        bbox = c.bbox(text_item)
+        rect_item = c.create_rectangle(bbox, outline="red", fill="grey")
+        c.tag_raise(text_item,rect_item)
+
+        self.canvas.insert(c, tk.INSERT)
         
 
     def OnTokenButtonPress(self, event):

@@ -8,6 +8,7 @@ from pygments import lex
 from pygments.lexers import PythonLexer
 
 import communicate as Communicate
+import generic_object as GenericObject
 
 # RENAME to Environment
 
@@ -31,6 +32,10 @@ highlight_map = {}
 additional_lines_call_point = None
 scroll_position = None
 
+generic_objects = []
+current_object_lines = []
+current_generic_object = None
+
 
 def get_function_call_lineno(call, lineno):
     for line, values in additional_lines_call_point.iteritems():
@@ -42,6 +47,21 @@ def get_function_call_lineno(call, lineno):
 def display_variables(variable_box):
     global variable_scope
     global variable_values
+
+    # print '\n\nVariable Values: '
+    # for k,v in variable_values.items():
+    #     print '{0}: {1}'.format(k,v)
+    # print 'Variable Scope:'
+    # for k,v in variable_scope.items():
+    #     print '{0}: {1}'.format(k,v)
+    # print 'Executed Code: '
+    # for k,v in executed_code.items():
+    #     print '{0}: {1}'.format(k,v)
+    # print 'DATA: '
+    # for k,v in data.items():
+    #     print '{0}: {1}'.format(k,v)
+    # print 'Generic Objects: {0}'.format(generic_objects)
+
     variable_box.delete(0.0, END)
     for func, variables in variable_scope.items():
         variables_line = ''
@@ -72,15 +92,40 @@ def set_variable_value(scope, variable, result):
     variable_values[scope][variable] = result
 
 
+def check_for_new_object(scope, variable, result):
+    global current_generic_object
+    global current_object_lines
+    if 'instance' in result:
+        class_name = result.split(' instance')[0].split('.')[1]
+        if class_name in data['classes']:
+            generic_object = GenericObject.GenericObject(class_name, variable)
+            if 'functions' in data['classes'][class_name] and \
+                    '__init__' in data['classes'][class_name]['functions']:
+                current_generic_object = generic_object
+                current_object_lines = data['classes'][class_name]['functions']['__init__']
+            generic_objects.append(generic_object)
+            return True
+    return False
+
+
+def check_add_to_object(scope, variable, result, lineno):
+    global current_object_lines
+    global current_generic_object
+
+    if lineno in current_object_lines:
+        current_generic_object.add_variable(variable, result)
+    else:
+        current_generic_object = None
+        current_object_lines = []
+
+
 def display_executed_code(executed_code, code_box, executed_code_box,
                           variable_box, output_box, total):
     global highlight_map
     highlight_map = {}
     display_map = {}
     tab_count = 0
-    # print 'THIS'
-    # print executed_code
-    # print
+
     for key, value in executed_code.iteritems():
         display_line = ''
         if total >= 0:
@@ -91,6 +136,8 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                     variable = value['result'].split('=')[0]
                     result = value['result'].split('=')[1]
                     set_variable_value(scope, variable, result)
+                    if not check_for_new_object(scope, variable, result):
+                        check_add_to_object(scope, variable, value['result'], value['lineno'])
                 if 'print' in value:
                     output_box.insert(INSERT, value['result'] + '\n')
             else:
@@ -132,8 +179,8 @@ def display_executed_code(executed_code, code_box, executed_code_box,
         highlight_map[key]['end'] = len(display_map[value['lineno']])
         tab_count += 1
 
-    print '\nHIGHLIGHT_MAP: {0}'.format(highlight_map)
-    print '\nADDITIONAL_LINES_CALL_POINT: {0}'.format(additional_lines_call_point)
+    # print '\nHIGHLIGHT_MAP: {0}'.format(highlight_map)
+    # print '\nADDITIONAL_LINES_CALL_POINT: {0}'.format(additional_lines_call_point)
 
     for key, value in display_map.iteritems():
         executed_code_box.insert(float(key), value)

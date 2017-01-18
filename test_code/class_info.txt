@@ -1,0 +1,56 @@
+Variable Values: 
+   global: {'n.left': '<__main__.Node instance at 0x10c6bcfc8>', 'n2': '<__main__.Node instance at 0x10c6bcfc8>', 'n': '<__main__.Node instance at 0x10c6bcf38>'}
+   __init__: {'self.right': 'None', 'self.value': 'None', 'self.left': 'None'}
+   set_value: {'self.q': '8', 'self.value': '2', 'v': '2'}
+
+Variable Scope:
+   global: ['n', 'n.set_value', 'n.left', 'n2', 'n.left.set_value', 'n.value', 'n.left.set_value(2)n.value', 'n.left.get_value']
+   get_value: ['self.value']
+   __init__: ['self.value', 'self.left', 'self.right']
+   set_value: ['v', 'self.value', 'self.q']
+
+Executed Code: 
+   3: {'assigned': True, 'values': {'Node()': '<__main__.Node instance at 0x10c6bcf38>'}, 'lineno': 14, 'result': 'n=<__main__.Node instance at 0x10c6bcf38>'}
+   4: {'values': {}, 'lineno': 2}
+   5: {'assigned': True, 'values': {'None': 'None'}, 'lineno': 3, 'result': 'self.value=None'}
+   6: {'assigned': True, 'values': {'None': 'None'}, 'lineno': 4, 'result': 'self.left=None'}
+   7: {'assigned': True, 'values': {'None': 'None'}, 'lineno': 5, 'result': 'self.right=None'}
+   8: {'values': {'1': '1', 'n.set_value(1)': 'None', 'n': '<__main__.Node instance at 0x10c6bcf38>'}, 'lineno': 15, 'result': 'None'}
+   9: {'values': {'v': '1'}, 'lineno': 7}
+   10: {'assigned': True, 'values': {'v': '1'}, 'lineno': 8, 'result': 'self.value=1'}
+   11: {'assigned': True, 'values': {'8': '8'}, 'lineno': 9, 'result': 'self.q=8'}
+   12: {'assigned': True, 'values': {'Node()': '<__main__.Node instance at 0x10c6bcfc8>'}, 'lineno': 16, 'result': 'n.left=<__main__.Node instance at 0x10c6bcfc8>'}
+   13: {'values': {}, 'lineno': 2}
+   14: {'assigned': True, 'values': {'None': 'None'}, 'lineno': 3, 'result': 'self.value=None'}
+   15: {'assigned': True, 'values': {'None': 'None'}, 'lineno': 4, 'result': 'self.left=None'}
+   16: {'assigned': True, 'values': {'None': 'None'}, 'lineno': 5, 'result': 'self.right=None'}
+   17: {'assigned': True, 'values': {'n.left': '<__main__.Node instance at 0x10c6bcfc8>', 'n': '<__main__.Node instance at 0x10c6bcf38>'}, 'lineno': 17, 'result': 'n2=<__main__.Node instance at 0x10c6bcfc8>'}
+   18: {'values': {'n.left': '<__main__.Node instance at 0x10c6bcfc8>', '2': '2', 'n.left.set_value(2)': 'None', 'n': '<__main__.Node instance at 0x10c6bcf38>'}, 'lineno': 18, 'result': 'None'}
+   19: {'values': {'v': '2'}, 'lineno': 7}
+   20: {'assigned': True, 'values': {'v': '2'}, 'lineno': 8, 'result': 'self.value=2'}
+   21: {'assigned': True, 'values': {'8': '8'}, 'lineno': 9, 'result': 'self.q=8'}
+   22: {'print': True, 'values': {'n.value': '1', 'n': '<__main__.Node instance at 0x10c6bcf38>'}, 'lineno': 19, 'result': '1'}
+   23: {'print': True, 'values': {'n.left': '<__main__.Node instance at 0x10c6bcfc8>', 'n.left.get_value()': '2', 'n': '<__main__.Node instance at 0x10c6bcf38>'}, 'lineno': 20, 'result': '2'}
+   24: {'values': {}, 'lineno': 11}
+   25: {'values': {'self': '<__main__.Node instance at 0x10c6bcfc8>', 'self.value': '2'}, 'lineno': 12, 'result': '2'}
+
+DATA: 
+   1: {'type': 'class', 'name': 'Node'}
+   2: {'expressions': [], 'type': 'func', 'declared': True}
+   3: {'assigned': ['self.value'], 'expressions': ['None'], 'type': 'assign'}
+   4: {'assigned': ['self.left'], 'expressions': ['None'], 'type': 'assign'}
+   5: {'assigned': ['self.right'], 'expressions': ['None'], 'type': 'assign'}
+   7: {'expressions': ['v'], 'type': 'func', 'declared': True}
+   8: {'assigned': ['self.value'], 'expressions': ['v'], 'type': 'assign'}
+   9: {'assigned': ['self.q'], 'expressions': ['8'], 'type': 'assign'}
+   11: {'expressions': [], 'type': 'func', 'declared': True}
+   12: {'expressions': ['self', 'self.value'], 'type': 'return'}
+   14: {'assigned': ['n'], 'assigned_expressions': {'n': ['n']}, 'expressions': ['Node()'], 'type': 'assign', 'additional_lines': ['Node']}
+   15: {'expressions': ['n', '1', 'n.set_value(1)'], 'additional_lines': ['n.set_value']}
+   16: {'assigned': ['n.left'], 'assigned_expressions': {'n.left': ['n']}, 'expressions': ['Node()'], 'type': 'assign', 'additional_lines': ['Node']}
+   17: {'assigned': ['n2'], 'assigned_expressions': {'n2': ['n2']}, 'expressions': ['n', 'n.left'], 'type': 'assign'}
+   18: {'expressions': ['n', 'n.left', '2', 'n.left.set_value(2)'], 'additional_lines': ['n.left.set_value']}
+   19: {'expressions': ['n', 'n.value'], 'type': 'print'}
+   20: {'expressions': ['n', 'n.left', 'n.left.get_value()'], 'type': 'print', 'additional_lines': ['n.left.get_value']}
+   function_lines: {'get_value': [11, 12], '__init__': [2, 3, 4, 5], 'set_value': [7, 8, 9]}
+   classes: {'Node': {'functions': {'get_value': [11, 12], '__init__': [2, 3, 4, 5], 'set_value': [7, 8, 9]}, 'variables': ['self.value', 'self.left', 'self.right', 'self.q']}}
