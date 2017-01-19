@@ -96,6 +96,8 @@ def combine_type(lineno, target_data, from_data):
 def combine_assigned(lineno, target_data, from_data):
     if 'assigned' in from_data[lineno]:
         target_data[lineno]['assigned'] = from_data[lineno]['assigned']
+    if 'assigned_expressions' in from_data[lineno]:
+        target_data[lineno]['assigned_expressions'] = from_data[lineno]['assigned_expressions']
 
 
 def combine_function_lines(lineno, target_data, from_data):

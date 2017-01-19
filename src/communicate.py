@@ -139,6 +139,7 @@ class Communicator(object):
             self.setup_executed_code(lineno)
         else:
             result = self.evaluate_expressions(data, lineno)
+            self.evaluate_assigned_expressions(data, lineno)
         assigned = None
         for a in data[lineno]['assigned']:
             if assigned is None:
@@ -233,6 +234,17 @@ class Communicator(object):
                         (lineno, data['classes'][name]['functions']['__init__'][:]))
         return final_expression
 
+    def evaluate_assigned_expressions(self, data, lineno):
+        if 'assigned_expressions' in data[lineno]:
+            for assigned,expressions in data[lineno]['assigned_expressions'].iteritems():
+                for expression in expressions:
+                    if assigned != expression:
+                        os.write(self.fd_write, 'p {0}\n'.format(expression))
+                        result = os.read(self.fd_read, 1000)
+                        if 'assigned_values' not in self.executed_code[self.call]:
+                            self.executed_code[self.call]['assigned_values'] = {}
+                        self.executed_code[self.call]['assigned_values'][expression] = result
+
     def evaluate_and_store_expressions(self, data, lineno):
         self.add_call_point(lineno)
         result = ''
@@ -307,7 +319,7 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
     return communicator
 
 if __name__ == '__main__':
-    main('../test_code/node_class.py')
+    # main('../test_code/node_class.py')
     # main('../test_code/code.py')
-    # main('user_code.py')
+    main('user_code.py')
     # main('../test_code/input_debug_test.py')

@@ -5,6 +5,7 @@ class Node():
       self.right = None
 
    def set_value(self, v):
+      a = 2
       self.value = v
       self.q = 8
 
@@ -12,12 +13,22 @@ class Node():
       return self.value
 
 n = Node()
-n.set_value(1)
+n.set_value(10)
 n.left = Node()
+n.left.left = Node()
 n2 = n.left
-n.left.set_value(2)
+n.left.set_value(12)
+n.left.left.set_value(13)
 print n.value
 print n.left.get_value()
+
+i = 0
+head = n
+while i < 5:
+   head.right = Node()
+   head = head.right
+   head.value = i
+   i += 1
 
 
 

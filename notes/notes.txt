@@ -7,6 +7,8 @@ how to relate errors to the user
 validation
 comment highlights are broken
 duplicate function/class names in the file will cause issues
+multiple code files
+threading for analysis
 
 ***FOR VARIABLE SCOPE
 

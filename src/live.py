@@ -32,9 +32,10 @@ highlight_map = {}
 additional_lines_call_point = None
 scroll_position = None
 
-generic_objects = []
+generic_objects = {}
 current_object_lines = []
 current_generic_object = None
+current_function = None
 
 
 def get_function_call_lineno(call, lineno):
@@ -48,19 +49,21 @@ def display_variables(variable_box):
     global variable_scope
     global variable_values
 
-    # print '\n\nVariable Values: '
+    # print '\n\n\n\nVariable Values: '
     # for k,v in variable_values.items():
-    #     print '{0}: {1}'.format(k,v)
+    #     print '\t{0}: {1}'.format(k,v)
     # print 'Variable Scope:'
     # for k,v in variable_scope.items():
-    #     print '{0}: {1}'.format(k,v)
+    #     print '\t{0}: {1}'.format(k,v)
     # print 'Executed Code: '
     # for k,v in executed_code.items():
-    #     print '{0}: {1}'.format(k,v)
+    #     print '\t{0}: {1}'.format(k,v)
     # print 'DATA: '
     # for k,v in data.items():
-    #     print '{0}: {1}'.format(k,v)
-    # print 'Generic Objects: {0}'.format(generic_objects)
+    #     print '\t{0}: {1}'.format(k,v)
+    # print 'Generic Objects:'
+    # for k,v in generic_objects.items():
+    #     print '\t{0}: {1}'.format(k,v)
 
     variable_box.delete(0.0, END)
     for func, variables in variable_scope.items():
@@ -92,18 +95,37 @@ def set_variable_value(scope, variable, result):
     variable_values[scope][variable] = result
 
 
+def get_object(instance_id):
+    if instance_id in generic_objects:
+        return generic_objects[instance_id]
+    return None
+
+
+def remove_object_name(name):
+    for k,v in generic_objects.iteritems():
+        if name in v.name:
+            v.name.remove(name) 
+
+
 def check_for_new_object(scope, variable, result):
     global current_generic_object
     global current_object_lines
-    if 'instance' in result:
+    if 'instance' in result and '.' in result:
         class_name = result.split(' instance')[0].split('.')[1]
-        if class_name in data['classes']:
-            generic_object = GenericObject.GenericObject(class_name, variable)
+        instance_id = result.split(' instance at ')[1].split('>')[0]
+        obj = get_object(instance_id)
+        remove_object_name(variable)
+        if obj is not None:
+            remove_object_name(variable)
+            obj.name.append(variable)
+        elif class_name in data['classes']:
+            generic_object = GenericObject.GenericObject(class_name, variable,
+                                                         instance_id)
             if 'functions' in data['classes'][class_name] and \
                     '__init__' in data['classes'][class_name]['functions']:
                 current_generic_object = generic_object
                 current_object_lines = data['classes'][class_name]['functions']['__init__']
-            generic_objects.append(generic_object)
+            generic_objects[instance_id] = generic_object
             return True
     return False
 
@@ -111,17 +133,60 @@ def check_for_new_object(scope, variable, result):
 def check_add_to_object(scope, variable, result, lineno):
     global current_object_lines
     global current_generic_object
+    global current_function
 
     if lineno in current_object_lines:
-        current_generic_object.add_variable(variable, result)
+        if 'self.' in variable:
+            current_generic_object.add_variable(variable, result)
+        elif current_function is not None:
+            current_generic_object.add_function_variable(current_function, variable, result)
     else:
         current_generic_object = None
+        current_function = None
         current_object_lines = []
+        if '.' in variable:
+            name = variable.split('.')[0]
+            for v in variable.split('.')[1:-1]:
+                name += '.' + v
+            obj = get_object_from_name(name)
+            if obj is not None:
+                obj.add_variable(variable, result)
+
+
+def get_object_from_name(name):
+    for k,v in generic_objects.iteritems():
+        if name in v.name:
+            return v
+    return None
+
+
+def check_modify_object(variable, result, lineno):
+    if '.' in variable:
+        main_object = get_object_from_name(variable.split('.')[0])
+        if main_object is not None:
+            for v in variable.split('.')[1:-1]:
+                instance_id = main_object.get_variable(v)
+                if 'instance' in instance_id and '.' in instance_id:
+                    instance_id = instance_id.split(' instance at ')[1].split('>')[0]
+                    main_object = get_object(instance_id)
+            
+            new_variable = variable.split('.')[-1]
+            main_object.add_variable(new_variable, result)
+
+
+def check_function_variables_arguments(lineno, values):
+    if lineno in current_object_lines:
+        for k,v in values.iteritems():
+            if current_generic_object is not None and current_function is not None:
+                current_generic_object.add_function_variable(current_function, k, v)
 
 
 def display_executed_code(executed_code, code_box, executed_code_box,
                           variable_box, output_box, total):
     global highlight_map
+    global current_generic_object
+    global current_object_lines
+    global current_function
     highlight_map = {}
     display_map = {}
     tab_count = 0
@@ -137,9 +202,38 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                     result = value['result'].split('=')[1]
                     set_variable_value(scope, variable, result)
                     if not check_for_new_object(scope, variable, result):
-                        check_add_to_object(scope, variable, value['result'], value['lineno'])
+                        check_add_to_object(scope, variable, value['result'],
+                                            value['lineno'])
+                    else:
+                        check_modify_object(variable, value['result'], value['lineno'])
                 if 'print' in value:
                     output_box.insert(INSERT, value['result'] + '\n')
+                # Add functions for classes
+                # if lineno of value has additional lines in data[lineno]
+                if (value['lineno'] in data and
+                        'additional_lines' in data[value['lineno']]):
+                    additional_lines = data[value['lineno']]['additional_lines']
+                    #  check if it is an object call with a .
+                    for additional_line in additional_lines:
+                        if '.' in additional_line:
+                            split_value = additional_line.split('.')
+                            seeking_variable = ''
+                            for v in split_value[:-1]:
+                                seeking_variable += v + '.'
+                            seeking_variable = seeking_variable.rstrip('.')
+                            seeking_function = split_value[-1]
+                            # GET LATEST OBJECT FROM VALUES 
+                            # Objects instance ID
+                            obj = value['values'][seeking_variable]
+                            if 'instance' in obj and '.' in obj:
+                                seeking_object_instance_id = obj.split(' instance at ')[1].split('>')[0]
+                                if seeking_object_instance_id in generic_objects:
+                                    obj = generic_objects[seeking_object_instance_id]
+                                    if seeking_function in data['function_lines']:
+                                        obj.add_function(seeking_function)
+                                        current_generic_object = obj
+                                        current_object_lines = data['function_lines'][seeking_function]
+                                        current_function = seeking_function
             else:
                 no_comma = True
                 scope = get_scope(value['lineno'])
@@ -150,6 +244,7 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                         display_line += ', '
                     display_line += '{0}={1}'.format(k, v)
                     set_variable_value(scope, k, v)
+                check_function_variables_arguments(value['lineno'], value['values'])
             display_variables(variable_box)
         total -= 1
         # Get correct tab length
