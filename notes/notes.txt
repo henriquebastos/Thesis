@@ -9,6 +9,7 @@ comment highlights are broken
 duplicate function/class names in the file will cause issues
 multiple code files
 threading for analysis
+handling arrays/lists/python objects to multiple variables yet all are updated
 
 ***FOR VARIABLE SCOPE
 

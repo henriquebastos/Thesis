@@ -9,6 +9,8 @@ from pygments.lexers import PythonLexer
 
 import communicate as Communicate
 import generic_object as GenericObject
+import treeview
+from treeview_wrappers import TreeWrapper, TreeViewer
 
 # RENAME to Environment
 
@@ -308,6 +310,37 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                                  line_length, opt_widget, lines))
 
 
+def get_classes():
+    classes = []
+    if 'classes' in data:
+        classes = data['classes'].keys()
+    return classes
+
+
+def display_objects(tree_wrapper, tree_viewer):
+    tree_viewer.clearTree()
+    tree_wrapper.generic_objects = generic_objects
+    tree_wrapper.classes = get_classes()
+    trees = []
+    root_obj = None
+
+    for obj in generic_objects.values():
+        trees.append(treeview.GenericTree(tree_viewer, obj))
+    for instance_id in generic_objects.keys():
+        appears_as_child = False
+        this_tree = None
+        for tree in trees:
+            if instance_id != tree.generic_object.instance_id:
+                for value in tree.generic_object.variables.values():
+                    if instance_id in value:
+                        appears_as_child = True
+            else:
+                this_tree = tree
+        if not appears_as_child:
+            root_obj = this_tree
+    root_obj.view()
+
+
 def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
     global variable_values
     executed_code_box.delete(0.0, END)
@@ -491,7 +524,8 @@ def input_box_has_changes(input_box):
 
 
 def debug_loop(from_box, executed_code_box, input_box, variable_box,
-               output_box, scale, scrolled_text_pair):
+               output_box, scale, scrolled_text_pair, tree_wrapper,
+               tree_viewer):
     global user_code
     global scale_size
     global executed_code
@@ -527,6 +561,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         reset_boxes(new_user_code, executed_code_box, variable_box, output_box)
         display_executed_code(executed_code, from_box, executed_code_box,
                               variable_box, output_box, scale.get())
+        display_objects(tree_wrapper, tree_viewer)
         if scroll_position is not None:
             scrolled_text_pair.right.configure(
                 yscrollcommand=scrolled_text_pair.on_textscroll)
@@ -545,6 +580,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         prev_scale_setting = scale_size
         display_executed_code(executed_code, from_box, executed_code_box,
                               variable_box, output_box, scale_size)
+        display_objects(tree_wrapper, tree_viewer)
         if scroll_position is not None:
             scrolled_text_pair.right.configure(
                 yscrollcommand=scrolled_text_pair.on_textscroll)
@@ -570,7 +606,8 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         user_code = ''
 
     root.after(500, debug_loop, from_box, executed_code_box, input_box,
-               variable_box, output_box, scale, scrolled_text_pair)
+               variable_box, output_box, scale, scrolled_text_pair,
+               tree_wrapper, tree_viewer)
 
 
 class ScrolledTextPair(Frame):
@@ -662,7 +699,8 @@ class Application(Frame):
 
         bottom_frame = Frame(main_frame, bg='grey')
         variable_frame = Frame(bottom_frame)
-        output_frame = Frame(bottom_frame)
+        output_frame = Frame(bottom_frame, width=50)
+        tree_frame = Frame(bottom_frame)
 
         main_frame.pack()
         middle_frame.pack(side=TOP)
@@ -672,6 +710,7 @@ class Application(Frame):
         input_frame.pack(side=LEFT)
         bottom_frame.pack(side=BOTTOM)
         variable_frame.pack(side=LEFT)
+        tree_frame.pack(side=LEFT)
         output_frame.pack(side=LEFT)
 
         QUIT = Button(master=menu_frame, text='Quit', command=self.close_all)
@@ -706,8 +745,12 @@ class Application(Frame):
         output_box = Text(output_frame)
         output_box.pack({'side': 'left'})
 
+        tree_wrapper = treeview.GenericObjectWrapper()
+        tree_viewer = TreeViewer(tree_wrapper, tree_frame) 
+
         root.after(500, debug_loop, code_box, executed_code_box, input_box,
-                   variable_box, output_box, execution_step, paired_text_boxes)
+                   variable_box, output_box, execution_step, paired_text_boxes,
+                   tree_wrapper, tree_viewer)
 
     def __init__(self, master=None):
         Frame.__init__(self, master)

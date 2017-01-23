@@ -9,12 +9,23 @@ class GenericObject:
         self.function_variables = {}
 
     def __repr__(self):
-        s = '\n\t\t\tClassName: {0}\n'.format(self.class_name)
-        s += '\t\t\tName: {0}\n'.format(self.name)
-        s += '\t\t\tInstance Id: {0}\n'.format(self.instance_id)
-        s += '\t\t\tVariables: {0}\n'.format(self.variables)
-        s += '\t\t\tFunctions: {0}\n'.format(self.functions)
-        s += '\t\t\tFunction Variables: {0}\n'.format(self.function_variables)
+        s = 'ClassName: {0}\n'.format(self.class_name)
+        s += 'Name: {0}\n'.format(self.name)
+        s += 'Instance Id: {0}\n'.format(self.instance_id)
+        s += 'Variables:\n'
+        for k,v in self.variables.iteritems():
+            s += '    {0}\n'.format(v)
+        s += 'Functions:\n'
+        for f in self.functions:
+            s += '    {0}:\n'.format(f)
+            if f in self.function_variables:
+                for k,v in self.function_variables[f].iteritems():
+                    s += '        {0}\n'.format(v)
+        # s += 'Functions:\n'
+        # for k,v in self.function_variables.iteritems():
+            # s += '    {0}:\n'.format(k)
+            # for k2,v2 in v.iteritems():
+            #     s += '        {0}\n'.format(v2)
         return s
 
     def add_variable(self, variable, result):
@@ -43,6 +54,17 @@ class GenericObject:
         if variable in self.variables:
             return self.variables[variable]
         return None
+
+    def get_children(self, class_types, generic_objects):
+        children = []
+        for name,value in self.variables.iteritems():
+            if 'instance at' in value:
+                class_name = value.split(' instance')[0].split('.')[1]
+                instance_id = value.split(' instance at ')[1].split('>')[0]
+                if class_name in class_types:
+                    children.append(generic_objects[instance_id])
+        return children
+
     
     # def insert(self, name, variables, functions):  
     #     self.generic_object = self.generic_object.insert(name, variables, functions)
