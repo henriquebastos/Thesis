@@ -25,9 +25,9 @@ print n.left.get_value()
 i = 0
 head = n
 while i < 5:
-   head.right = Node()
-   head = head.right
-   head.value = i
+#   head.right = Node()
+#   head = head.right
+#   head.value = i
    i += 1
 
 

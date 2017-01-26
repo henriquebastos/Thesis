@@ -33,6 +33,7 @@ exit_event = threading.Event()
 highlight_map = {}
 additional_lines_call_point = None
 scroll_position = None
+successful_exit = True
 
 generic_objects = {}
 current_object_lines = []
@@ -351,6 +352,17 @@ def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
         executed_code_box.insert(float(i), '\n')
 
 
+def reset_objects():
+    global generic_objects
+    global current_object_lines
+    global current_generic_object
+    global current_function
+    generic_objects = {}
+    current_object_lines = []
+    current_generic_object = None
+    current_function = None
+
+
 def highlight_code(code_box):
     code_box.mark_set('range_start', '1.0')
     data = code_box.get('1.0', 'end-1c')
@@ -473,14 +485,22 @@ class CommunicationThread(threading.Thread):
         global input_event
         global user_inputs
         global additional_lines_call_point
-        communicator = Communicate.main(self.filename, self.stop_event,
-                                        input_event, user_inputs)
-        if not self.stop_event.isSet():
-            executed_code = communicator.executed_code
-            data = communicator.data
-            variable_scope = communicator.variable_scope
-            additional_lines_call_point = \
-                communicator.additional_lines_call_point
+        global successful_exit
+        try:
+            communicator = Communicate.main(self.filename, self.stop_event,
+                                            input_event, user_inputs)
+            if not self.stop_event.isSet():
+                executed_code = communicator.executed_code
+                data = communicator.data
+                variable_scope = communicator.variable_scope
+                additional_lines_call_point = \
+                    communicator.additional_lines_call_point
+                reset_objects()
+                successful_exit = True
+
+        except Exception as e:
+            successful_exit = False
+            self.stop()
 
     def stop(self):
         self.stop_event.set()
@@ -554,11 +574,13 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
                 communicationThread.start()
         except:
             pass
-    elif scale.get() < scale_size or scale.get() != prev_scale_setting:
+    # elif scale.get() < scale_size or scale.get() != prev_scale_setting:
+    elif scale.get() != prev_scale_setting:
         scroll_position = scrolled_text_pair.scrollbar.get()
         scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
         prev_scale_setting = scale.get()
         reset_boxes(new_user_code, executed_code_box, variable_box, output_box)
+        reset_objects()
         display_executed_code(executed_code, from_box, executed_code_box,
                               variable_box, output_box, scale.get())
         display_objects(tree_wrapper, tree_viewer)
@@ -571,21 +593,22 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
     if communicationThread is not None and not communicationThread.isAlive():
         input_event.clear()
         communicationThread = None
-        reset_boxes(new_user_code, executed_code_box, variable_box,
-                    output_box)
-        tag_lines(from_box, executed_code_box)
-        scale.config(to=len(executed_code))
-        scale.set(len(executed_code))
-        scale_size = len(executed_code)
-        prev_scale_setting = scale_size
-        display_executed_code(executed_code, from_box, executed_code_box,
-                              variable_box, output_box, scale_size)
-        display_objects(tree_wrapper, tree_viewer)
-        if scroll_position is not None:
-            scrolled_text_pair.right.configure(
-                yscrollcommand=scrolled_text_pair.on_textscroll)
-            scrolled_text_pair.right.yview('moveto', scroll_position[0])
-            scroll_position = None
+        if successful_exit:
+            reset_boxes(new_user_code, executed_code_box, variable_box,
+                        output_box)
+            tag_lines(from_box, executed_code_box)
+            scale.config(to=len(executed_code))
+            scale.set(len(executed_code))
+            scale_size = len(executed_code)
+            prev_scale_setting = scale_size
+            display_executed_code(executed_code, from_box, executed_code_box,
+                                  variable_box, output_box, scale_size)
+            display_objects(tree_wrapper, tree_viewer)
+            if scroll_position is not None:
+                scrolled_text_pair.right.configure(
+                    yscrollcommand=scrolled_text_pair.on_textscroll)
+                scrolled_text_pair.right.yview('moveto', scroll_position[0])
+                scroll_position = None
 
     # Check for new input
     check_for_new_input(input_box)
