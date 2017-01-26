@@ -98,6 +98,12 @@ class TreeViewer(Frame):
             currlevel = nextlevel
         return levels, maxrow
 
+    def get_line_name(self, node, parent):
+        for k,v in parent.variables.iteritems():
+            if node.instance_id in v:
+                return k
+        return ''
+
     def drawLevels(self, levels, maxrow, wrap):
         rowpos = 0                                         # draw tree per plan
         for level in levels:                               # set click handlers
@@ -119,6 +125,25 @@ class TreeViewer(Frame):
                             parent.__colpos + Colsz*.25,    # from x-y, to x-y
                             parent.__rowpos + Rowsz*.5,
                             colpos + Colsz*.25, rowpos, arrow='last', width=1)
+                        # Attempt draw variable name next to line
+                        # self.canvas.create_text(
+                        #     parent.__colpos + Colsz*.1,    # from x-y, to x-y
+                        #     parent.__rowpos + Rowsz*.75,
+                        #     text='Test')
+                        line_name = self.get_line_name(node, parent)
+                        if parent.__colpos >= colpos:
+                            # draw text on left
+                            self.canvas.create_text(
+                                colpos + Colsz*.05,    # from x-y, to x-y
+                                rowpos - Rowsz*.25,
+                                text=line_name)
+                        else:
+                            # draw text on right
+                            self.canvas.create_text(
+                                colpos + Colsz*.35,    # from x-y, to x-y
+                                rowpos - Rowsz*.25,
+                                text=line_name)
+                            #colpos + Colsz*.25, rowpos, text='Test')
                     node.__rowpos = rowpos
                     node.__colpos = colpos          # mark node, private attrs
             rowpos = rowpos + Rowsz

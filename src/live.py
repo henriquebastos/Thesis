@@ -339,7 +339,8 @@ def display_objects(tree_wrapper, tree_viewer):
                 this_tree = tree
         if not appears_as_child:
             root_obj = this_tree
-    root_obj.view()
+    if root_obj is not None:
+        root_obj.view()
 
 
 def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
