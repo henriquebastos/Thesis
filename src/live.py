@@ -22,6 +22,7 @@ FILE_NAME = 'user_code.py'
 INPUT_FILE_NAME = 'user_input.txt'
 scale_size = 0
 prev_scale_setting = 0
+prev_start_scale_setting = 0
 executed_code = None
 data = None
 variable_scope = None
@@ -366,7 +367,7 @@ def add_tags_to_executed_code(executed_code_box, code_box):
 
 
 def display_executed_code(executed_code, code_box, executed_code_box,
-                          variable_box, output_box, total):
+                          variable_box, output_box, start, total):
     global highlight_map
     global current_generic_object
     global current_object_lines
@@ -376,7 +377,7 @@ def display_executed_code(executed_code, code_box, executed_code_box,
     tab_count = 0
     for key, value in executed_code.iteritems():
         display_line = ''
-        if total >= 0:
+        if total >= 0 and start <= 0:
             if 'result' in value:
                 if 'assigned' in value:
                     handle_assignment_in_executed_code(value)
@@ -389,16 +390,15 @@ def display_executed_code(executed_code, code_box, executed_code_box,
             else:
                 display_line = handle_functions_in_executed_code(value)
             display_variables(variable_box)
-        total -= 1
-        tab_count = handle_highlights_in_executed_code(key, value, display_map,
+
+            tab_count = handle_highlights_in_executed_code(key, value, display_map,
                                                        display_line, tab_count)
+        total -= 1
+        start -= 1
+        # tab_count = handle_highlights_in_executed_code(key, value, display_map,
+        #                                                display_line, tab_count)
     for key, value in display_map.iteritems():
         executed_code_box.insert(float(key), value)
-        # for token, content in lex(data, PythonLexer()):
-        #     executed_code_box.mark_set('range_end', 'range_start + %dc' % len(content))
-        #     executed_code_box.tag_add(str(token), 'range_start', 'range_end')
-        #     executed_code_box.mark_set('range_start', 'range_end')
-    # highlight_executed_code(executed_code_box)
     add_tags_to_executed_code(executed_code_box, code_box)
 
 
@@ -668,12 +668,13 @@ def input_box_has_changes(input_box):
 
 
 def debug_loop(from_box, executed_code_box, input_box, variable_box,
-               output_box, scale, scrolled_text_pair, tree_wrapper,
-               tree_viewer):
+               output_box, start_scale, scale, scrolled_text_pair,
+               tree_wrapper, tree_viewer):
     global user_code
     global scale_size
     global executed_code
     global prev_scale_setting
+    global prev_start_scale_setting
     global communicationThread
     global input_event
     global scroll_position
@@ -699,14 +700,18 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         except:
             pass
     # elif scale.get() < scale_size or scale.get() != prev_scale_setting:
-    elif scale.get() != prev_scale_setting:
+    elif (scale.get() != prev_scale_setting or 
+            start_scale.get() != prev_start_scale_setting):
         scroll_position = scrolled_text_pair.scrollbar.get()
         scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
         prev_scale_setting = scale.get()
+        start_scale.config(to=prev_scale_setting)
+        prev_start_scale_setting = start_scale.get()
         reset_boxes(new_user_code, executed_code_box, variable_box, output_box)
         reset_objects()
         display_executed_code(executed_code, from_box, executed_code_box,
-                              variable_box, output_box, scale.get())
+                              variable_box, output_box, start_scale.get(),
+                              scale.get())
         display_objects(tree_wrapper, tree_viewer)
         if scroll_position is not None:
             scrolled_text_pair.right.configure(
@@ -721,12 +726,15 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
             reset_boxes(new_user_code, executed_code_box, variable_box,
                         output_box)
             tag_lines(from_box, executed_code_box)
-            scale.config(to=len(executed_code))
-            scale.set(len(executed_code))
             scale_size = len(executed_code)
+            scale.config(to=scale_size)
+            scale.set(scale_size)
             prev_scale_setting = scale_size
+            start_scale.config(to=scale_size)
+            prev_start_scale_setting = start_scale.get()
             display_executed_code(executed_code, from_box, executed_code_box,
-                                  variable_box, output_box, scale_size)
+                                  variable_box, output_box, start_scale.get(),
+                                  scale_size)
             display_objects(tree_wrapper, tree_viewer)
             highlight_code(from_box)
             if scroll_position is not None:
@@ -754,8 +762,8 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         user_code = ''
 
     root.after(500, debug_loop, from_box, executed_code_box, input_box,
-               variable_box, output_box, scale, scrolled_text_pair,
-               tree_wrapper, tree_viewer)
+               variable_box, output_box, start_scale, scale,
+               scrolled_text_pair, tree_wrapper, tree_viewer)
 
 
 class ScrolledTextPair(Frame):
@@ -875,6 +883,8 @@ class Application(Frame):
         QUIT = Button(master=menu_frame, text='Quit', command=self.close_all)
         QUIT.pack(side=LEFT)
 
+        start_execution_step = Scale(menu_frame, orient=HORIZONTAL)
+        start_execution_step.pack(side=LEFT)
         execution_step = Scale(menu_frame, orient=HORIZONTAL)
         execution_step.pack(side=LEFT)
 
@@ -908,8 +918,9 @@ class Application(Frame):
         tree_viewer = TreeViewer(tree_wrapper, tree_frame) 
 
         root.after(500, debug_loop, code_box, executed_code_box, input_box,
-                   variable_box, output_box, execution_step, paired_text_boxes,
-                   tree_wrapper, tree_viewer)
+                   variable_box, output_box, start_execution_step,
+                   execution_step, paired_text_boxes, tree_wrapper,
+                   tree_viewer)
 
     def __init__(self, master=None):
         Frame.__init__(self, master)
