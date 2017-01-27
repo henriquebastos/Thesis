@@ -13,7 +13,7 @@
 from Tkinter import *
 from tkMessageBox import showinfo
 
-Width, Height = 350, 350                    # start canvas size (reset per tree)
+Width, Height = 560, 350                    # start canvas size (reset per tree)
 Rowsz = 100                                 # pixels per tree row
 Colsz = 100                                 # pixels per tree col
 
@@ -47,12 +47,12 @@ class TreeViewer(Frame):
            self.drawTree(tree)
 
     def makeWidgets(self, bg):
-        self.title = Label(self, text='PyTree 1.0')
+        # self.title = Label(self, text='PyTree 1.0')
         self.canvas = Canvas(self, bg=bg, borderwidth=0)
         vbar = Scrollbar(self)
         hbar = Scrollbar(self, orient='horizontal')
 
-        self.title.pack(side=TOP, fill=X)
+        # self.title.pack(side=TOP, fill=X)
         vbar.pack(side=RIGHT,  fill=Y)                  # pack canvas after bars
         hbar.pack(side=BOTTOM, fill=X)
         self.canvas.pack(side=TOP, fill=BOTH, expand=YES)
@@ -64,8 +64,8 @@ class TreeViewer(Frame):
         self.canvas.config(height=Height, width=Width)  # viewable area size
 
     def clearTree(self):
-        mylabel = 'PyTree 1.0 - ' + self.wrapper.__class__.__name__
-        self.title.config(text=mylabel)
+        # mylabel = 'PyTree 1.0 - ' + self.wrapper.__class__.__name__
+        # self.title.config(text=mylabel)
         self.unbind_all('<Button-1>')
         self.canvas.delete('all')                       # clear events, drawing
 
@@ -74,7 +74,7 @@ class TreeViewer(Frame):
         wrapper = self.wrapper
         levels, maxrow = self.planLevels(tree, wrapper)
         self.canvas.config(scrollregion=(                     # scrollable area
-            0, 0, (Colsz * maxrow), (Rowsz * len(levels)) ))  # upleft, lowright
+            0, 0, (Colsz * (maxrow+3)), (Rowsz * len(levels)) ))  # upleft, lowright
         self.drawLevels(levels, maxrow, wrapper)
 
     def planLevels(self, root, wrap):
@@ -118,34 +118,35 @@ class TreeViewer(Frame):
                     win.pack()
                     win.bind('<Button-1>', 
                         lambda e, n=node, handler=self.onClick: handler(e, n))
+                    win_width = Colsz*.5
+                    if len(text) > 5:
+                        win_width = Colsz*(.5 + (.5 * len(text) / 10))
                     self.canvas.create_window(colpos, rowpos, anchor=NW, 
-                                window=win, width=Colsz*.5, height=Rowsz*.5)
+                                window=win, width=win_width, height=Rowsz*.5)
                     if parent != None:
                         self.canvas.create_line(
                             parent.__colpos + Colsz*.25,    # from x-y, to x-y
                             parent.__rowpos + Rowsz*.5,
-                            colpos + Colsz*.25, rowpos, arrow='last', width=1)
-                        # Attempt draw variable name next to line
-                        # self.canvas.create_text(
-                        #     parent.__colpos + Colsz*.1,    # from x-y, to x-y
-                        #     parent.__rowpos + Rowsz*.75,
-                        #     text='Test')
+                            colpos + win_width*.5, rowpos, arrow='last', width=1)
                         line_name = self.get_line_name(node, parent)
                         if parent.__colpos >= colpos:
                             # draw text on left
                             self.canvas.create_text(
-                                colpos + Colsz*.05,    # from x-y, to x-y
+                                colpos + Colsz*.05,
                                 rowpos - Rowsz*.25,
                                 text=line_name)
                         else:
                             # draw text on right
                             self.canvas.create_text(
-                                colpos + Colsz*.35,    # from x-y, to x-y
+                                colpos + Colsz*.35,
                                 rowpos - Rowsz*.25,
                                 text=line_name)
-                            #colpos + Colsz*.25, rowpos, text='Test')
                     node.__rowpos = rowpos
-                    node.__colpos = colpos          # mark node, private attrs
+                    if len(text) > 5:
+                        node.__colpos = colpos + win_width*.25
+                        colpos += win_width * 0.5
+                    else:
+                        node.__colpos = colpos
             rowpos = rowpos + Rowsz
 
     def onClick(self, event, node):

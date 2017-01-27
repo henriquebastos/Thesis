@@ -24,9 +24,11 @@ class GenericObjectWrapper(TreeWrapper):
                 for n in node.name:
                     if '.' not in n:
                         return n
-                return '*'
+                return '{0}_{1}'.format(node.class_name, node.simple_id)
+                # return '*'
             else:
-                return '*'
+                return '{0}_{1}'.format(node.class_name, node.simple_id)
+                # return '*'
         except:
             return str(node)
     def value(self, node):

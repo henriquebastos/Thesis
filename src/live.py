@@ -95,7 +95,13 @@ def set_variable_value(scope, variable, result):
     global variable_values
     if scope not in variable_values:
         variable_values[scope] = {}
-    variable_values[scope][variable] = result
+    if 'instance' in result and '.' in result:
+        class_name = result.split(' instance')[0].split('.')[1]
+        instance_id = result.split(' instance at ')[1].split('>')[0]
+        obj = get_object(instance_id)
+        variable_values[scope][variable] = '{0}_{1}'.format(class_name, obj.simple_id)
+    else:
+        variable_values[scope][variable] = result
 
 
 def get_object(instance_id):
@@ -123,7 +129,7 @@ def check_for_new_object(scope, variable, result):
             obj.name.append(variable)
         elif class_name in data['classes']:
             generic_object = GenericObject.GenericObject(class_name, variable,
-                                                         instance_id)
+                                                         instance_id, len(generic_objects))
             if 'functions' in data['classes'][class_name] and \
                     '__init__' in data['classes'][class_name]['functions']:
                 current_generic_object = generic_object
@@ -140,7 +146,14 @@ def check_add_to_object(scope, variable, result, lineno):
 
     if lineno in current_object_lines:
         if 'self.' in variable:
-            current_generic_object.add_variable(variable, result)
+            if 'instance at' in result and '.' in result:
+                class_name = result.split('=')[1].split(' instance')[0].split('.')[1]
+                instance_id = result.split(' instance at ')[1].split('>')[0]
+                obj = get_object(instance_id)
+                simple_id = obj.simple_id
+                current_generic_object.add_variable(variable, result, class_name, simple_id)
+            else:
+                current_generic_object.add_variable(variable, result)
         elif current_function is not None:
             current_generic_object.add_function_variable(current_function, variable, result)
     else:
@@ -153,7 +166,14 @@ def check_add_to_object(scope, variable, result, lineno):
                 name += '.' + v
             obj = get_object_from_name(name)
             if obj is not None:
-                obj.add_variable(variable, result)
+                if 'instance at' in result and '.' in result:
+                    class_name = result.split('=')[1].split(' instance')[0].split('.')[1]
+                    instance_id = result.split(' instance at ')[1].split('>')[0]
+                    obj = get_object(instance_id)
+                    simple_id = obj.simple_id
+                    obj.add_variable(variable, result, class_name, simple_id)
+                else:
+                    obj.add_variable(variable, result)
 
 
 def get_object_from_name(name):
@@ -174,7 +194,14 @@ def check_modify_object(variable, result, lineno):
                     main_object = get_object(instance_id)
             
             new_variable = variable.split('.')[-1]
-            main_object.add_variable(new_variable, result)
+            if 'instance at' in result and '.' in result:
+                class_name = result.split('=')[1].split(' instance')[0].split('.')[1]
+                instance_id = result.split(' instance at ')[1].split('>')[0]
+                obj = get_object(instance_id)
+                simple_id = obj.simple_id
+                main_object.add_variable(new_variable, result, class_name, simple_id)
+            else:
+                main_object.add_variable(new_variable, result)
 
 
 def check_function_variables_arguments(lineno, values):
@@ -184,110 +211,137 @@ def check_function_variables_arguments(lineno, values):
                 current_generic_object.add_function_variable(current_function, k, v)
 
 
-def display_executed_code(executed_code, code_box, executed_code_box,
-                          variable_box, output_box, total):
-    global highlight_map
+def handle_assignment_in_executed_code(value):
+    scope = get_scope(value['lineno'])
+    variable = value['result'].split('=')[0]
+    result = value['result'].split('=')[1]
+    # set_variable_value(scope, variable, result)
+    if not check_for_new_object(scope, variable, result):
+        check_add_to_object(scope, variable, value['result'],
+                            value['lineno'])
+    else:
+        check_modify_object(variable, value['result'], value['lineno'])
+    set_variable_value(scope, variable, result)
+
+
+def handle_additional_lines_in_executed_code(value):
     global current_generic_object
     global current_object_lines
     global current_function
-    highlight_map = {}
-    display_map = {}
-    tab_count = 0
+    additional_lines = data[value['lineno']]['additional_lines']
+    #  check if it is an object call with a .
+    for additional_line in additional_lines:
+        if '.' in additional_line:
+            split_value = additional_line.split('.')
+            seeking_variable = ''
+            for v in split_value[:-1]:
+                seeking_variable += v + '.'
+            seeking_variable = seeking_variable.rstrip('.')
+            seeking_function = split_value[-1]
+            # GET LATEST OBJECT FROM VALUES 
+            # Objects instance ID
+            obj = value['values'][seeking_variable]
+            if 'instance' in obj and '.' in obj:
+                seeking_object_instance_id = obj.split(' instance at ')[1].split('>')[0]
+                if seeking_object_instance_id in generic_objects:
+                    obj = generic_objects[seeking_object_instance_id]
+                    if seeking_function in data['function_lines']:
+                        obj.add_function(seeking_function)
+                        current_generic_object = obj
+                        current_object_lines = data['function_lines'][seeking_function]
+                        current_function = seeking_function
 
-    for key, value in executed_code.iteritems():
-        display_line = ''
-        if total >= 0:
-            if 'result' in value:
-                display_line += '{0}'.format(value['result'])
-                if 'assigned' in value:
-                    scope = get_scope(value['lineno'])
-                    variable = value['result'].split('=')[0]
-                    result = value['result'].split('=')[1]
-                    set_variable_value(scope, variable, result)
-                    if not check_for_new_object(scope, variable, result):
-                        check_add_to_object(scope, variable, value['result'],
-                                            value['lineno'])
-                    else:
-                        check_modify_object(variable, value['result'], value['lineno'])
-                if 'print' in value:
-                    output_box.insert(INSERT, value['result'] + '\n')
-                # Add functions for classes
-                # if lineno of value has additional lines in data[lineno]
-                if (value['lineno'] in data and
-                        'additional_lines' in data[value['lineno']]):
-                    additional_lines = data[value['lineno']]['additional_lines']
-                    #  check if it is an object call with a .
-                    for additional_line in additional_lines:
-                        if '.' in additional_line:
-                            split_value = additional_line.split('.')
-                            seeking_variable = ''
-                            for v in split_value[:-1]:
-                                seeking_variable += v + '.'
-                            seeking_variable = seeking_variable.rstrip('.')
-                            seeking_function = split_value[-1]
-                            # GET LATEST OBJECT FROM VALUES 
-                            # Objects instance ID
-                            obj = value['values'][seeking_variable]
-                            if 'instance' in obj and '.' in obj:
-                                seeking_object_instance_id = obj.split(' instance at ')[1].split('>')[0]
-                                if seeking_object_instance_id in generic_objects:
-                                    obj = generic_objects[seeking_object_instance_id]
-                                    if seeking_function in data['function_lines']:
-                                        obj.add_function(seeking_function)
-                                        current_generic_object = obj
-                                        current_object_lines = data['function_lines'][seeking_function]
-                                        current_function = seeking_function
-            else:
-                no_comma = True
-                scope = get_scope(value['lineno'])
-                for k, v in value['values'].iteritems():
-                    if no_comma:
-                        no_comma = False
-                    else:
-                        display_line += ', '
-                    display_line += '{0}={1}'.format(k, v)
-                    set_variable_value(scope, k, v)
-                check_function_variables_arguments(value['lineno'], value['values'])
-            display_variables(variable_box)
-        total -= 1
-        # Get correct tab length
-        tabs = ''
-        for i in range(tab_count):
-            tabs += '  '
-        current_length = 0
-        if key not in highlight_map:  # Setup highlight map key
-            highlight_map[key] = {}
-        if value['lineno'] in display_map:
-            # Display executed code at the correct indentation
-            current_length = len(display_map[value['lineno']])
-            if current_length >= len(tabs):
-                tab_count += 2
-                tabs += '    '
-            display_map[value['lineno']] += tabs[current_length:] + \
-                display_line
-            # Mark lines start point
-            highlight_map[key]['start'] = current_length + \
-                len(tabs[current_length:])
+
+def get_display_line_in_executed_code(value):
+    if 'instance at' in value['result'] and '.' in value['result']:
+        try:
+            variable = value['result'].split('=')[0]
+            result = value['result'].split('=')[1]
+            class_name = result.split(' instance')[0].split('.')[1]
+            instance_id = result.split(' instance at ')[1].split('>')[0]
+            obj = get_object(instance_id)
+            return '{0}={1}_{2}'.format(variable, class_name, obj.simple_id)
+        except:
+            return '{0}'.format(value['result'])
+    else:
+        return '{0}'.format(value['result'])
+
+
+def handle_functions_in_executed_code(value):
+    display_line = ''
+    no_comma = True
+    scope = get_scope(value['lineno'])
+    for k, v in value['values'].iteritems():
+        if no_comma:
+            no_comma = False
         else:
-            # Display executed code at the correct indentation
-            display_map[value['lineno']] = tabs + display_line
-            # Mark lines start point
-            highlight_map[key]['start'] = current_length + len(tabs)
-        highlight_map[key]['lineno'] = value['lineno']
-        highlight_map[key]['end'] = len(display_map[value['lineno']])
-        tab_count += 1
+            display_line += ', '
+        display_line += '{0}={1}'.format(k, v)
+        set_variable_value(scope, k, v)
+    check_function_variables_arguments(value['lineno'], value['values'])
+    return display_line
 
-    # print '\nHIGHLIGHT_MAP: {0}'.format(highlight_map)
-    # print '\nADDITIONAL_LINES_CALL_POINT: {0}'.format(additional_lines_call_point)
 
-    for key, value in display_map.iteritems():
-        executed_code_box.insert(float(key), value)
+def handle_highlights_in_executed_code(key, value, display_map, display_line,
+                                       tab_count):
+    global highlight_map
+    # Get correct tab length
+    tabs = ''
+    for i in range(tab_count):
+        tabs += '  '
+    current_length = 0
+    if key not in highlight_map:  # Setup highlight map key
+        highlight_map[key] = {}
+    if value['lineno'] in display_map:
+        # Display executed code at the correct indentation
+        current_length = len(display_map[value['lineno']])
+        if current_length >= len(tabs):
+            tab_count += 2
+            tabs += '    '
+        display_map[value['lineno']] += tabs[current_length:] + \
+            display_line
+        # Mark lines start point
+        highlight_map[key]['start'] = current_length + \
+            len(tabs[current_length:])
+    else:
+        # Display executed code at the correct indentation
+        display_map[value['lineno']] = tabs + display_line
+        # Mark lines start point
+        highlight_map[key]['start'] = current_length + len(tabs)
+    highlight_map[key]['lineno'] = value['lineno']
+    highlight_map[key]['end'] = len(display_map[value['lineno']])
+    tab_count += 1
+    return tab_count
 
+
+def highlight_executed_code(executed_code_box, value):
+    lineno = value['lineno']
+    start = value['start']
+    end = value['end']
+    data = executed_code_box.get('{0}.{1}'.format(lineno, start),
+                                 '{0}.{1}'.format(lineno, end))
+    offset = 0
+    for token, content in lex(data, PythonLexer()):
+        if content == 'None':
+            executed_code_box.tag_add('Token.Literal.Number.Integer', 
+                                  '{0}.{1}'.format(lineno, start + offset), 
+                                  '{0}.{1}'.format(lineno, start + offset + len(content)))
+        elif str(token) == 'Token.Operator' and content == '.':
+            pass
+        else:
+            executed_code_box.tag_add(str(token), 
+                                  '{0}.{1}'.format(lineno, start + offset), 
+                                  '{0}.{1}'.format(lineno, start + offset + len(content)))
+        offset += len(content)
+
+
+def add_tags_to_executed_code(executed_code_box, code_box):
     for key, value in highlight_map.iteritems():
         calling_lines = []
         calling_line = get_function_call_lineno(key, value['lineno'])
         if calling_line is not None:
             calling_lines.append(calling_line)
+        highlight_executed_code(executed_code_box, value)
         executed_code_box.tag_add('call{0}'.format(key),
                                   '{0}.{1}'.format(value['lineno'],
                                                    value['start']),
@@ -311,11 +365,55 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                                  line_length, opt_widget, lines))
 
 
+def display_executed_code(executed_code, code_box, executed_code_box,
+                          variable_box, output_box, total):
+    global highlight_map
+    global current_generic_object
+    global current_object_lines
+    global current_function
+    highlight_map = {}
+    display_map = {}
+    tab_count = 0
+    for key, value in executed_code.iteritems():
+        display_line = ''
+        if total >= 0:
+            if 'result' in value:
+                if 'assigned' in value:
+                    handle_assignment_in_executed_code(value)
+                if 'print' in value:
+                    output_box.insert(INSERT, value['result'] + '\n')
+                if (value['lineno'] in data and
+                        'additional_lines' in data[value['lineno']]):
+                    handle_additional_lines_in_executed_code(value)
+                display_line += get_display_line_in_executed_code(value)
+            else:
+                display_line = handle_functions_in_executed_code(value)
+            display_variables(variable_box)
+        total -= 1
+        tab_count = handle_highlights_in_executed_code(key, value, display_map,
+                                                       display_line, tab_count)
+    for key, value in display_map.iteritems():
+        executed_code_box.insert(float(key), value)
+        # for token, content in lex(data, PythonLexer()):
+        #     executed_code_box.mark_set('range_end', 'range_start + %dc' % len(content))
+        #     executed_code_box.tag_add(str(token), 'range_start', 'range_end')
+        #     executed_code_box.mark_set('range_start', 'range_end')
+    # highlight_executed_code(executed_code_box)
+    add_tags_to_executed_code(executed_code_box, code_box)
+
+
 def get_classes():
     classes = []
-    if 'classes' in data:
+    if data is not None and 'classes' in data:
         classes = data['classes'].keys()
     return classes
+
+
+def get_functions():
+    functions = []
+    if data is not None and 'function_lines' in data:
+        functions = data['function_lines'].keys()
+    return functions
 
 
 def display_objects(tree_wrapper, tree_viewer):
@@ -332,7 +430,7 @@ def display_objects(tree_wrapper, tree_viewer):
         this_tree = None
         for tree in trees:
             if instance_id != tree.generic_object.instance_id:
-                for value in tree.generic_object.variables.values():
+                for value in tree.generic_object.object_variables.values():
                     if instance_id in value:
                         appears_as_child = True
             else:
@@ -367,9 +465,34 @@ def reset_objects():
 def highlight_code(code_box):
     code_box.mark_set('range_start', '1.0')
     data = code_box.get('1.0', 'end-1c')
+    is_def = False
     for token, content in lex(data, PythonLexer()):
+        if content == 'def' and str(token) == 'Token.Keyword':
+            is_def = True
+        elif content == ')' and str(token) == 'Token.Punctuation':
+            is_def = False
+        
+        # print '{0}: {1}\t\t{2}   {3}'.format(token, content, get_classes(), get_functions())
+        
         code_box.mark_set('range_end', 'range_start + %dc' % len(content))
-        code_box.tag_add(str(token), 'range_start', 'range_end')
+        if content == 'None':
+            # purple
+            code_box.tag_add('Token.Literal.Number.Integer', 'range_start', 'range_end')
+        elif ((content == '__init__' and str(token) == 'Token.Name.Function') or
+                (content in get_classes() and str(token) == 'Token.Name') or
+                ((content == 'class' or content == 'def') and str(token) == 'Token.Keyword')):
+            # blue
+            code_box.tag_add('Token.Name.Builtin', 'range_start', 'range_end')
+        elif is_def and str(token) == 'Token.Name':
+            # orange
+            code_box.tag_add('Token.Name.Builtin.Pseudo', 'range_start', 'range_end')
+        elif str(token) == 'Token.Name' and (content in get_classes() or
+                content in get_functions()):
+            code_box.tag_add('Token.Name.Builtin', 'range_start', 'range_end')
+        elif str(token) == 'Token.Operator' and content == '.':
+            pass
+        else:
+            code_box.tag_add(str(token), 'range_start', 'range_end')
         code_box.mark_set('range_start', 'range_end')
 
 
@@ -605,6 +728,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
             display_executed_code(executed_code, from_box, executed_code_box,
                                   variable_box, output_box, scale_size)
             display_objects(tree_wrapper, tree_viewer)
+            highlight_code(from_box)
             if scroll_position is not None:
                 scrolled_text_pair.right.configure(
                     yscrollcommand=scrolled_text_pair.on_textscroll)
@@ -645,12 +769,13 @@ class ScrolledTextPair(Frame):
         #     kwargs['width'] = 30
         # Creating the widgets
         self.left = Text(self, foreground='white', background='gray15')
-        self.left.tag_configure('Token.Keyword', foreground='red')
-        self.left.tag_configure('Token.Operator', foreground='red')
-        self.left.tag_configure('Token.Name.Function', foreground='green')
+        self.left.tag_configure('Token.Keyword', foreground='orange red')
+        self.left.tag_configure('Token.Operator', foreground='orange red')
+        self.left.tag_configure('Token.Name.Class', foreground='green yellow')
+        self.left.tag_configure('Token.Name.Function', foreground='green yellow')
         self.left.tag_configure('Token.Literal.Number.Integer',
-                                foreground='purple')
-        self.left.tag_configure('Token.Name.Builtin', foreground='cyan')
+                                foreground='medium orchid')
+        self.left.tag_configure('Token.Name.Builtin', foreground='medium turquoise')
         self.left.tag_configure('Token.Literal.String.Single',
                                 foreground='yellow')
         self.left.tag_configure('Token.Name.Builtin.Pseudo',
@@ -665,6 +790,16 @@ class ScrolledTextPair(Frame):
 
         self.right = Text(self, foreground='white', background='gray15',
                           wrap=NONE)
+        self.right.tag_configure('Token.Keyword', foreground='orange red')
+        self.right.tag_configure('Token.Operator', foreground='orange red')
+        self.right.tag_configure('Token.Name.Function', foreground='lawn green')
+        self.right.tag_configure('Token.Literal.Number.Integer',
+                                foreground='medium orchid')
+        self.right.tag_configure('Token.Name.Builtin', foreground='medium turquoise')
+        self.right.tag_configure('Token.Literal.String.Single',
+                                foreground='yellow')
+        self.right.tag_configure('Token.Name.Builtin.Pseudo',
+                                foreground='orange')
         self.right.tag_configure('HIGHLIGHT', background='gray5')
         self.right.pack({'side': 'left'})
 

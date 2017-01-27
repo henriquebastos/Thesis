@@ -39,11 +39,11 @@ class WalkAST(ast.NodeVisitor):
 
     def print_map(self):
         self.remove_empty_expressions()
-        print
-        print 'Line Expressions:'
-        print '-----------------'
-        for line_num, line in self.data.iteritems():
-            print '{0}: {1}'.format(line_num, line)
+        # print
+        # print 'Line Expressions:'
+        # print '-----------------'
+        # for line_num, line in self.data.iteritems():
+        #     print '{0}: {1}'.format(line_num, line)
 
     def remove_empty_expressions(self):
         for lineno in self.data.keys():
@@ -118,7 +118,6 @@ class WalkAST(ast.NodeVisitor):
                 utils.add_string_to_data(stmt.lineno, walker.data,
                                          walker.line)
                 # utils.add_function_line(self.data, node.name, stmt.lineno)
-                print '\t\t\t\t\t{0}'.format(walker.data)
                 utils.combine_all_data(self.data, walker.data)
                 utils.combine_variable_scopes(self.variable_scope,
                                               walker.variable_scope)
@@ -797,7 +796,6 @@ class WalkAST(ast.NodeVisitor):
                 else:
                     utils.add_string_to_data(self.lineno, arg_walker.data,
                                              arg_walker.line)
-                print '\t\t\t\t\tArg_walker: {0}'.format(arg_walker.data)
                 utils.combine_data(self.lineno, self.data, arg_walker.data)
                 utils.combine_variable_scopes(self.variable_scope,
                                               arg_walker.variable_scope)
