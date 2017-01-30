@@ -52,6 +52,9 @@ class Communicator(object):
         self.user_inputs = user_inputs
         self.data, self.variable_scope = get_expressions(file)
         lineno = 0
+        # print self.data
+        # print self.variable_scope
+        # print 
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
             lineno = self.parse_line(output)
@@ -113,7 +116,9 @@ class Communicator(object):
                 elif data[lineno]['type'] == 'return':
                     self.evaluate_return(data, lineno)
             else:
+                # print 'Line: {0}'.format(lineno)
                 result = self.evaluate_expressions(data, lineno)
+                # print result
                 self.executed_code[self.call]['result'] = result
                 self.call += 1
 
@@ -224,8 +229,7 @@ class Communicator(object):
             for name in data[lineno]['additional_lines']:
                 if '.' in name:
                     name = name.split('.')[-1]
-
-                if name in data['function_lines']:
+                if 'function_lines' in data and name in data['function_lines']:
                     self.looking_for.append(
                         (lineno, data['function_lines'][name][:]))
                 elif ('classes' in data and name in data['classes'] and 
@@ -251,7 +255,8 @@ class Communicator(object):
         if 'expressions' in data[lineno]:
             self.setup_executed_code(lineno)
             result = self.evaluate(data[lineno]['expressions'], True)
-        print '\t\t{0}'.format(result)
+        if result == '\'[]\'' or result == '[]':
+            return '[]'
         return '[' + result + ']'
 
     def evaluate_targets(self, data, lineno):
@@ -264,16 +269,23 @@ class Communicator(object):
         for item in items:
             os.write(self.fd_write, 'p {0}\n'.format(item))
             result = os.read(self.fd_read, 1000)
+            if '\n(Pdb) ' in result:
+                result = result.rstrip('\n(Pdb) ')
+                result = result[1:-1]
             self.executed_code[self.call]['values'][item] = result
             if add_all:
                 if '\n(Pdb) ' in result:
                     result = result.rstrip('\n(Pdb) ')
+                    result = result[1:-1]
                 if final_expression is None:
                     final_expression = result
                 else:
                     final_expression += ',' + result
             else:
                 final_expression = result
+            if '\n(Pdb) ' in final_expression:
+                final_expression = final_expression.rstrip('\n(Pdb) ')
+                final_expression = final_expression[1:-1]
         return final_expression
 
     def add_call_point(self, lineno):

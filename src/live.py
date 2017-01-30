@@ -570,7 +570,7 @@ def tag_lines(code_box, executed_code_box):
                 if '.' in name:
                     name = name.split('.')[-1]
 
-                if name in data['function_lines']:
+                if 'function_lines' in data and name in data['function_lines']:
                     for func_line in data['function_lines'][name]:
                         additional_lines.append(func_line)
                 elif ('classes' in data and name in data['classes'] and
@@ -690,11 +690,14 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
         highlight_code(from_box)
         tag_lines(from_box, executed_code_box)
-        user_code = new_user_code
-        with open(FILE_NAME, "w") as code_file:
-            code_file.write(user_code)
+        # user_code = new_user_code
+        # with open(FILE_NAME, "w") as code_file:
+        #     code_file.write(user_code)
         try:
             if communicationThread is None:
+                user_code = new_user_code
+                with open(FILE_NAME, "w") as code_file:
+                    code_file.write(user_code)
                 communicationThread = CommunicationThread('user_code.py')
                 communicationThread.start()
         except:
@@ -841,7 +844,7 @@ class Application(Frame):
             user_inputs.append('quit')
             input_event.set()
             while communicationThread.isAlive():
-                print 'HERE'
+                # print 'HERE'
                 continue
             communicationThread = None
         self.quit()
@@ -871,7 +874,7 @@ class Application(Frame):
 
         main_frame.pack()
         middle_frame.pack(side=TOP)
-        menu_frame.pack(side=TOP)
+        menu_frame.pack(side=TOP, fill=X)
         code_frame.pack(side=LEFT)
         executed_code_frame.pack(side=LEFT)
         input_frame.pack(side=LEFT)
@@ -884,22 +887,27 @@ class Application(Frame):
         QUIT.pack(side=LEFT)
 
         start_execution_step = Scale(menu_frame, orient=HORIZONTAL)
-        start_execution_step.pack(side=LEFT)
+        start_execution_step.pack(side=LEFT, padx=200)
+        
+        input_button = Button(master=menu_frame, text='Input File',
+                              command=lambda: self.open_input_file(input_box))
+        input_button.pack(side=RIGHT)
+        
         execution_step = Scale(menu_frame, orient=HORIZONTAL)
-        execution_step.pack(side=LEFT)
+        execution_step.pack(side=RIGHT, padx=200)
 
+        code_title = Label(code_frame, text='Source Code\t\t\t\t\t\tExecuted Code')
+        code_title.pack(side=TOP, fill=X)
         paired_text_boxes = ScrolledTextPair(code_frame, foreground='white',
                                              background='gray15')
         code_box = paired_text_boxes.left
         executed_code_box = paired_text_boxes.right
         paired_text_boxes.pack()
 
+        input_title = Label(input_frame, text='Input')
+        input_title.pack(side=TOP, fill=X)
         input_box = Text(input_frame)
         input_box.pack({'side': 'left'})
-
-        input_button = Button(master=menu_frame, text='Input File',
-                              command=lambda: self.open_input_file(input_box))
-        input_button.pack(side=LEFT)
 
         if os.path.isfile(INPUT_FILE_NAME):
             with open(INPUT_FILE_NAME, 'r') as input_file:
@@ -907,13 +915,19 @@ class Application(Frame):
                 for line in lines:
                     input_box.insert(INSERT, line)
 
+        variable_title = Label(variable_frame, text='Variables')
+        variable_title.pack(side=TOP, fill=X)
         variable_box = Text(variable_frame)
         variable_box.tag_configure("BOLD", font=('-weight bold'))
         variable_box.pack({'side': 'left'})
 
+        output_title = Label(output_frame, text='Output')
+        output_title.pack(side=TOP, fill=X)
         output_box = Text(output_frame)
         output_box.pack({'side': 'left'})
 
+        tree_frame_title = Label(tree_frame, text='Objects')
+        tree_frame_title.pack(side=TOP, fill=X)
         tree_wrapper = treeview.GenericObjectWrapper()
         tree_viewer = TreeViewer(tree_wrapper, tree_frame) 
 

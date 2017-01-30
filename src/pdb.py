@@ -14,6 +14,7 @@ import re
 import pprint
 import traceback
 
+import signal
 
 class Restart(Exception):
     """Causes a debugger to be restarted for the debugged python program."""
@@ -745,9 +746,36 @@ class Pdb(bdb.Bdb, cmd.Cmd):
     do_rv = do_retval
 
     def _getval(self, arg):
+        # print '\n\n\t\t\t***** _getval: \n{0}*****\n\n'.format(arg)
         try:
-            return eval(arg, self.curframe.f_globals,
-                        self.curframe_locals)
+            # curframe = self.get_stack(self.__f, self.__t)[0][self.curindex][0]
+            # curframe_locals = copy.deepcopy(curframe.f_locals)
+            # curframe_globals = curframe.f_globals
+            
+            # The f_locals dictionary is updated from the actual frame
+            # locals whenever the .f_locals accessor is called, so we
+            # cache it here to ensure that modifications are not overwritten.
+            # self.curframe_locals = self.curframe.f_locals
+            # return eval(arg, self.curframe.f_globals,
+            #             self.curframe_locals)
+
+            # return eval(arg, curframe_globals, curframe_locals)
+            fd_read, fd_write = os.pipe()
+            pid = os.fork()
+            if pid:  # Parent
+                os.close(fd_write)
+                r =  os.read(fd_read, 1000)
+                os.kill(pid, signal.SIGKILL)
+                os.close(fd_read)
+                return r.split('\nNone\n(Pdb) ')[0]
+            else:  # Child
+                os.close(fd_read)
+                os.dup2(fd_write, sys.stdout.fileno())
+                self.curframe_locals = self.curframe.f_locals
+                r = eval(arg, self.curframe.f_globals,
+                           self.curframe_locals)
+                print r
+                os.close(fd_write)
         except:
             t, v = sys.exc_info()[:2]
             if isinstance(t, str):
