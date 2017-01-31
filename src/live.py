@@ -79,8 +79,13 @@ def display_variables(variable_box, call_num):
                         func in variable_values_per_line[call_num] and
                         variable in variable_values_per_line[call_num][func] and
                         variable_values_per_line[call_num][func][variable] is not None):
-                    variables_line += '{0}={1}\n'.format(
-                        variable, variable_values_per_line[call_num][func][variable])
+                    result = variable_values_per_line[call_num][func][variable]
+                    if 'instance' in result and '.' in result:
+                        variables_line += '{0}={1}\n'.format(
+                            variable, variable_values[func][variable])
+                    else:
+                        variables_line += '{0}={1}\n'.format(
+                            variable, variable_values_per_line[call_num][func][variable])
                 else:
                     variables_line += '{0}={1}\n'.format(
                         variable, variable_values[func][variable])

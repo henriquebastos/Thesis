@@ -14,49 +14,50 @@ a4.append(5)
 print a4
 
 
-# class Node():
-#    def __init__(self):
-#       self.value = None
-#       self.left = None
-#       self.right = None
-#       self.left_center = None
-#       self.right_center = None
-#       self.center = None
+class Node():
+   def __init__(self):
+      self.value = None
+      self.left = None
+      self.right = None
+      self.left_center = None
+      self.right_center = None
+      self.center = None
 
-#    def set_value(self, v):
-#       a = 2
-#       self.value = v
-#       self.q = 8
+   def set_value(self, v):
+      a = 2
+      self.value = v
+      self.q = 8
 
-#    def get_value(self):
-#       return self.value
+   def get_value(self):
+      return self.value
 
-# class really_long_name():
-#    def __init__(self):
-#       self.v = None
+class really_long_name():
+   def __init__(self):
+      self.v = None
 
-# n = Node()
-# #n.center = Node()
-# #n.left_center = Node()
-# #n.right_center = Node()
-# n.set_value(10)
-# n.left = Node()
-# n.left.left = Node()
-# n.left.left.right = really_long_name()
-# n.left.left.right.left = Node()
-# n2 = n.left
-# n.left.set_value(12)
-# n.left.left.set_value(13)
-# print n.value
-# print n.left.get_value()
+n = Node()
+n.center = Node()
+n.left_center = Node()
+n.right_center = Node()
+n.set_value(10)
+n.left = Node()
+n.left.left = Node()
+n.left.left.right = really_long_name()
+n.left.left.right.left = Node()
+n2 = n.left
+n2.right = Node()
+n.left.set_value(12)
+n.left.left.set_value(13)
+print n.value
+print n.left.get_value()
 
-# i = 0
-# head = n
-# while i < 5:
-#    head.right = Node()
-#    head = head.right
-#    head.value = i
-#    i += 1
+i = 0
+head = n
+while i < 5:
+   head.right = Node()
+   head = head.right
+   head.value = i
+   i += 1
 
 
 def sum(x,y):

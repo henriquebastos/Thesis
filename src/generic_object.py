@@ -69,6 +69,7 @@ class GenericObject:
                 instance_id = value.split(' instance at ')[1].split('>')[0]
                 if class_name in class_types:
                     children.append(generic_objects[instance_id])
+        children.reverse()
         return children
 
     

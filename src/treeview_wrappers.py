@@ -99,7 +99,7 @@ class TreeViewer(Frame):
         return levels, maxrow
 
     def get_line_name(self, node, parent):
-        for k,v in parent.variables.iteritems():
+        for k,v in parent.object_variables.iteritems():
             if node.instance_id in v:
                 return k
         return ''
@@ -127,7 +127,8 @@ class TreeViewer(Frame):
                         self.canvas.create_line(
                             parent.__colpos + Colsz*.25,    # from x-y, to x-y
                             parent.__rowpos + Rowsz*.5,
-                            colpos + win_width*.5, rowpos, arrow='last', width=1)
+                            colpos + win_width*.5, rowpos,
+                            arrow='last', width=1, fill='grey50')
                         line_name = self.get_line_name(node, parent)
                         if parent.__colpos >= colpos:
                             # draw text on left
