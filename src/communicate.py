@@ -57,34 +57,10 @@ class Communicator(object):
         self.data, self.variable_scope = get_expressions(file)
         lineno = 0
 
-        # print self.data['function_lines']
-        # print self.variable_scope
-
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
             output2 = os.read(fd_read_2, 1000)
-            # if lineno in self.data:
-                # self.variable_values[lineno] = {}
-            for scope, variables in self.variable_scope.iteritems():
-                # self.variable_values[lineno][scope] = {}
-                for variable in variables:
-                    os.write(fd_write_2, 'p {0}\n'.format(variable))
-                    result = os.read(fd_read_2, 1000)
-                    # print 'Examine Variable Values: {0}={1}***'.format(variable, result)
-                    # result = result.rstrip('\n(Pdb) ')[1:-1]
-                    # if '\\n' in result:
-                    #     result = result.split('\\n')[0][1:]
-                    # else:
-                    result = result.rstrip('\n(Pdb) ')
-                    # print 'Fixed Examine Variable Values: {0}={1}---'.format(variable, result)
-                    if self.call > 0 and '*** NameError' not in result and '<built-in method' not in result:
-                        if self.call-1 not in self.variable_values:
-                            self.variable_values[self.call-1] = {}
-                        if scope not in self.variable_values[self.call-1]:
-                            self.variable_values[self.call-1][scope] = {}
-                        self.variable_values[self.call-1][scope][variable] = result
-                    # else:
-                    #     self.variable_values[lineno][scope][variable] = result
+            self.evaluate_variable_values()
             lineno = self.parse_line(output)
             if lineno in self.data:
                 self.evaluate_line(self.data, lineno)
@@ -100,6 +76,19 @@ class Communicator(object):
                 return
         os.kill(pid, signal.SIGUSR1)
         os.kill(pid2, signal.SIGUSR1)
+
+    def evaluate_variable_values(self):
+        for scope, variables in self.variable_scope.iteritems():
+            for variable in variables:
+                os.write(self.fd_write_2, 'p {0}\n'.format(variable))
+                result = os.read(self.fd_read_2, 1000)
+                result = result.rstrip('\n(Pdb) ')
+                if self.call > 0 and '*** NameError' not in result and '<built-in method' not in result:
+                    if self.call-1 not in self.variable_values:
+                        self.variable_values[self.call-1] = {}
+                    if scope not in self.variable_values[self.call-1]:
+                        self.variable_values[self.call-1][scope] = {}
+                    self.variable_values[self.call-1][scope][variable] = result
 
     def parse_line(self, line):
         lineno = -1
@@ -149,9 +138,7 @@ class Communicator(object):
                 elif data[lineno]['type'] == 'return':
                     self.evaluate_return(data, lineno)
             else:
-                # print 'Line: {0}'.format(lineno)
                 result = self.evaluate_expressions(data, lineno)
-                # print result
                 self.executed_code[self.call]['result'] = result
                 self.call += 1
 
@@ -189,7 +176,6 @@ class Communicator(object):
             else:
                 assigned += ',' + a
         if result is not None:
-            # print assigned + '=' + result
             self.executed_code[self.call]['result'] = assigned + '=' + result
         self.executed_code[self.call]['assigned'] = True
         self.call += 1
@@ -282,7 +268,6 @@ class Communicator(object):
                     if assigned != expression:
                         os.write(self.fd_write, 'p {0}\n'.format(expression))
                         result = os.read(self.fd_read, 1000)
-                        # print 'Evaluate Assigned Expressions: {0}={1}'.format(expression, result)
                         if 'assigned_values' not in self.executed_code[self.call]:
                             self.executed_code[self.call]['assigned_values'] = {}
                         self.executed_code[self.call]['assigned_values'][expression] = result
@@ -307,11 +292,6 @@ class Communicator(object):
         for item in items:
             os.write(self.fd_write, 'p {0}\n'.format(item))
             result = os.read(self.fd_read, 1000)
-            # print 'Evaluate: {0}={1}'.format(item, result)
-            # if '\\n' in result:
-            #     result = result.split('\\n')[0][1:]
-            # if '\n(Pdb) ' in result:
-                # result = result.rstrip('\n(Pdb) ')[1:-1]
             result = result.rstrip('\n(Pdb) ')
             self.executed_code[self.call]['values'][item] = result
             if add_all:
@@ -376,22 +356,14 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
     os.close(debugger_read)
     os.kill(pid, signal.SIGKILL)
 
-    # print communicator.executed_lines
-    # print communicator.executed_code
-    # print
-    # print communicator.variable_values
-    # print
-    # print
+    # TODO remove this and make it part of os.read()
+    # May already be done.
     for key, value in communicator.executed_code.iteritems():
-        # print '{0}: Lineno: {1}'.format(key, value['lineno'])
         if 'result' in value:
             value['result'] = value['result'].rstrip('\n(Pdb) ')
-            # print 'Result: {0}'.format(value['result'])
-        # print 'Values:'
         for k, v in value['values'].iteritems():
             v = v.rstrip('\n(Pdb) ')
             value['values'][k] = v
-            # print '\t{0}: {1}'.format(k, v)
     return communicator
 
 if __name__ == '__main__':
