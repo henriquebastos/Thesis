@@ -16,6 +16,20 @@ import traceback
 
 import signal
 
+keywords = ['append', 'extend', 'insert', 'remove', 'pop', 'clear', 'reverse', 'del']
+
+def has_no_keywords(arg):
+    for word in keywords:
+        if word in arg:
+            return False
+    return True
+
+def receive_signal(signum, stack):
+    os.close(sys.stdin.fileno())
+    os.close(sys.stdout.fileno())
+
+signal.signal(signal.SIGUSR1, receive_signal)
+
 class Restart(Exception):
     """Causes a debugger to be restarted for the debugged python program."""
     pass
@@ -746,36 +760,33 @@ class Pdb(bdb.Bdb, cmd.Cmd):
     do_rv = do_retval
 
     def _getval(self, arg):
-        # print '\n\n\t\t\t***** _getval: \n{0}*****\n\n'.format(arg)
         try:
-            # curframe = self.get_stack(self.__f, self.__t)[0][self.curindex][0]
-            # curframe_locals = copy.deepcopy(curframe.f_locals)
-            # curframe_globals = curframe.f_globals
-            
-            # The f_locals dictionary is updated from the actual frame
-            # locals whenever the .f_locals accessor is called, so we
-            # cache it here to ensure that modifications are not overwritten.
-            # self.curframe_locals = self.curframe.f_locals
-            # return eval(arg, self.curframe.f_globals,
-            #             self.curframe_locals)
-
-            # return eval(arg, curframe_globals, curframe_locals)
-            fd_read, fd_write = os.pipe()
-            pid = os.fork()
-            if pid:  # Parent
-                os.close(fd_write)
-                r =  os.read(fd_read, 1000)
-                os.kill(pid, signal.SIGKILL)
-                os.close(fd_read)
-                return r.split('\nNone\n(Pdb) ')[0]
-            else:  # Child
-                os.close(fd_read)
-                os.dup2(fd_write, sys.stdout.fileno())
-                self.curframe_locals = self.curframe.f_locals
-                r = eval(arg, self.curframe.f_globals,
-                           self.curframe_locals)
-                print r
-                os.close(fd_write)
+            if has_no_keywords(arg):
+                return eval(arg, self.curframe.f_globals,
+                            self.curframe_locals)
+            else:
+                return None
+            # fd_read, fd_write = os.pipe()
+            # pid = os.fork()
+            # if pid:  # Parent
+            #     # os.close(self.fd_write)
+            #     r = os.read(self.fd_read, 1000)
+            #     # os.close(fd_read)
+            #     os.kill(pid, signal.SIGKILL)
+            #     # return r.split('\nNone\n(Pdb) ')[0]
+            #     return r
+            # else:  # Child
+            #     # os.close(fd_read)
+            #     os.close(sys.stdin.fileno())
+            #     os.close(sys.stdout.fileno())
+            #     os.dup2(self.fd_write, sys.stdout.fileno())
+            #     print eval(arg, self.curframe.f_globals,
+            #                self.curframe_locals)
+            #     # os.close(fd_write)
+            #     exit(0)
+                # os.exit(1) # see if exit without execption
+        except SystemExit:
+            pass
         except:
             t, v = sys.exc_info()[:2]
             if isinstance(t, str):

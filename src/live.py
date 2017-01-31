@@ -27,6 +27,7 @@ executed_code = None
 data = None
 variable_scope = None
 variable_values = {}
+variable_values_per_line = {}
 communicationThread = None
 input_event = threading.Event()
 rerun_event = threading.Event()
@@ -49,7 +50,7 @@ def get_function_call_lineno(call, lineno):
                 return line
 
 
-def display_variables(variable_box):
+def display_variables(variable_box, lineno):
     global variable_scope
     global variable_values
 
@@ -74,8 +75,15 @@ def display_variables(variable_box):
         variables_line = ''
         for variable in variables:
             if func in variable_values and variable in variable_values[func]:
-                variables_line += '{0}={1}\n'.format(
-                    variable, variable_values[func][variable])
+                if (lineno in variable_values_per_line and
+                        func in variable_values_per_line[lineno] and
+                        variable in variable_values_per_line[lineno][func] and
+                        variable_values_per_line[lineno][func][variable] is not None):
+                    variables_line += '{0}={1}\n'.format(
+                        variable, variable_values_per_line[lineno][func][variable])
+                else:
+                    variables_line += '{0}={1}\n'.format(
+                        variable, variable_values[func][variable])
         if variables_line != '':
             variable_box.insert(INSERT, '{0}:\n'.format(func), 'BOLD')
             variable_box.insert(INSERT, variables_line)
@@ -375,7 +383,13 @@ def display_executed_code(executed_code, code_box, executed_code_box,
     highlight_map = {}
     display_map = {}
     tab_count = 0
+    # print data
+    # print variable_scope
+    # print
+    # print variable_values_per_line
+    # print
     for key, value in executed_code.iteritems():
+        # print '{0}: {1}'.format(key, value)
         display_line = ''
         if total >= 0 and start <= 0:
             if 'result' in value:
@@ -389,7 +403,7 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                 display_line += get_display_line_in_executed_code(value)
             else:
                 display_line = handle_functions_in_executed_code(value)
-            display_variables(variable_box)
+            display_variables(variable_box, value['lineno'])
 
             tab_count = handle_highlights_in_executed_code(key, value, display_map,
                                                        display_line, tab_count)
@@ -609,6 +623,7 @@ class CommunicationThread(threading.Thread):
         global input_event
         global user_inputs
         global additional_lines_call_point
+        global variable_values_per_line
         global successful_exit
         try:
             communicator = Communicate.main(self.filename, self.stop_event,
@@ -619,9 +634,9 @@ class CommunicationThread(threading.Thread):
                 variable_scope = communicator.variable_scope
                 additional_lines_call_point = \
                     communicator.additional_lines_call_point
+                variable_values_per_line = communicator.variable_values
                 reset_objects()
                 successful_exit = True
-
         except Exception as e:
             successful_exit = False
             self.stop()
@@ -643,6 +658,7 @@ def check_for_new_input(input_box):
             with open(INPUT_FILE_NAME, "w") as input_file:
                 for user_input in user_inputs:
                     input_file.write('{0}\n'.format(user_input))
+                input_file.close()
 
 
 def input_box_has_changes(input_box):
@@ -664,6 +680,7 @@ def input_box_has_changes(input_box):
         with open(INPUT_FILE_NAME, "w") as input_file:
             for user_input in user_inputs:
                 input_file.write('{0}\n'.format(user_input))
+            input_file.close()
     return has_changed
 
 
@@ -698,6 +715,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
                 user_code = new_user_code
                 with open(FILE_NAME, "w") as code_file:
                     code_file.write(user_code)
+                    code_file.close()
                 communicationThread = CommunicationThread('user_code.py')
                 communicationThread.start()
         except:
@@ -797,6 +815,7 @@ class ScrolledTextPair(Frame):
                 lines = code_file.readlines()
                 for line in lines:
                     self.left.insert(INSERT, line)
+                code_file.close()
         self.left.pack({'side': 'left'})
 
         self.right = Text(self, foreground='white', background='gray15',
@@ -914,6 +933,7 @@ class Application(Frame):
                 lines = input_file.readlines()
                 for line in lines:
                     input_box.insert(INSERT, line)
+                input_file.close()
 
         variable_title = Label(variable_frame, text='Variables')
         variable_title.pack(side=TOP, fill=X)

@@ -1,17 +1,17 @@
-# a3 = []
-# a3.append(1)
-# print a3
-# a = 1
-# a1 = []
-# a2 = a1
-# a1.append(1)
-# a2.append(2)
-# print a1
-# print a2
-# print 1
-# a4 = [1, 2, 3, 4]
-# a4.append(5)
-# print a4
+a3 = []
+a3.append(1)
+print a3
+a = 1
+a1 = []
+a2 = a1
+a1.append(1)
+a2.append(2)
+print a1
+print a2
+print 1
+a4 = [1, 2, 3, 4]
+a4.append(5)
+print a4
 
 
 # class Node():

@@ -819,6 +819,7 @@ if __name__ == '__main__':
     # file = '../test_code/input_debug_test.py'
     with open(file, 'r') as myfile:
         source_code = myfile.read()
+        myfile.close()
     tree = ast.parse(source_code)
     print ast.dump(tree)
     walker = WalkAST()

@@ -10,6 +10,7 @@ import walk_ast
 def get_expressions(file):
     with open(file, 'r') as myfile:
         source_code = myfile.read()
+        myfile.close()
     tree = ast.parse(source_code)
     # print ast.dump(tree)
     walker = walk_ast.WalkAST()
@@ -40,11 +41,12 @@ class Communicator(object):
         self.user_inputs_index = 0
         self.data = None
         self.variable_scope = None
+        self.variable_values = {}
         self.additional_lines_call_point = {}
         self.looking_for = []
 
     def communicate(self, fd_write, fd_read, file, stop_event=None,
-                    input_event=None, user_inputs=None):
+                    input_event=None, user_inputs=None, pid=None):
         self.fd_write = fd_write
         self.fd_read = fd_read
         self.stop_event = stop_event
@@ -52,11 +54,28 @@ class Communicator(object):
         self.user_inputs = user_inputs
         self.data, self.variable_scope = get_expressions(file)
         lineno = 0
-        # print self.data
-        # print self.variable_scope
-        # print 
+
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
+            # print output
+            if lineno in self.data:
+                self.variable_values[lineno] = {}
+                for scope, variables in self.variable_scope.iteritems():
+                    self.variable_values[lineno][scope] = {}
+                    for variable in variables:
+                        os.write(self.fd_write, 'p {0}\n'.format(variable))
+                        result = os.read(self.fd_read, 1000)
+                        # print 'Examine Variable Values: {0}={1}***'.format(variable, result)
+                        # result = result.rstrip('\n(Pdb) ')[1:-1]
+                        # if '\\n' in result:
+                        #     result = result.split('\\n')[0][1:]
+                        # else:
+                        result = result.rstrip('\n(Pdb) ')
+                        # print 'Fixed Examine Variable Values: {0}={1}---'.format(variable, result)
+                        if '*** NameError' in result or '<built-in method' in result:
+                            self.variable_values[lineno][scope][variable] = None
+                        else:
+                            self.variable_values[lineno][scope][variable] = result
             lineno = self.parse_line(output)
             if lineno in self.data:
                 self.evaluate_line(self.data, lineno)
@@ -66,7 +85,12 @@ class Communicator(object):
             os.write(self.fd_write, 's\n')
             # Terminate on long loops
             if self.call > 1000 or self.stop_event.isSet():
+                print 'Tell child to close fds'
+                os.kill(pid, signal.SIGUSR1)
                 return
+        print 'Tell child to close fds'
+        os.kill(pid, signal.SIGUSR1)
+        print 'DONE AT LINENO: {0}'.format(lineno)
 
     def parse_line(self, line):
         lineno = -1
@@ -245,6 +269,7 @@ class Communicator(object):
                     if assigned != expression:
                         os.write(self.fd_write, 'p {0}\n'.format(expression))
                         result = os.read(self.fd_read, 1000)
+                        # print 'Evaluate Assigned Expressions: {0}={1}'.format(expression, result)
                         if 'assigned_values' not in self.executed_code[self.call]:
                             self.executed_code[self.call]['assigned_values'] = {}
                         self.executed_code[self.call]['assigned_values'][expression] = result
@@ -269,9 +294,12 @@ class Communicator(object):
         for item in items:
             os.write(self.fd_write, 'p {0}\n'.format(item))
             result = os.read(self.fd_read, 1000)
-            if '\n(Pdb) ' in result:
-                result = result.rstrip('\n(Pdb) ')
-                result = result[1:-1]
+            # print 'Evaluate: {0}={1}'.format(item, result)
+            # if '\\n' in result:
+            #     result = result.split('\\n')[0][1:]
+            # if '\n(Pdb) ' in result:
+                # result = result.rstrip('\n(Pdb) ')[1:-1]
+            result = result.rstrip('\n(Pdb) ')
             self.executed_code[self.call]['values'][item] = result
             if add_all:
                 if '\n(Pdb) ' in result:
@@ -284,8 +312,7 @@ class Communicator(object):
             else:
                 final_expression = result
             if '\n(Pdb) ' in final_expression:
-                final_expression = final_expression.rstrip('\n(Pdb) ')
-                final_expression = final_expression[1:-1]
+                final_expression = final_expression.rstrip('\n(Pdb) ')[1:-1]
         return final_expression
 
     def add_call_point(self, lineno):
@@ -310,11 +337,13 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
         os.close(debugger_write)
         communicator = Communicator()
         communicator.communicate(communicator_write, debugger_read, file,
-                                 stop_event, input_event, user_inputs)
+                                 stop_event, input_event, user_inputs, pid)
     else:  # Child
         os.close(debugger_read)
         os.close(communicator_write)
         launch_child(debugger_write, communicator_read, file)
+    os.close(communicator_write)
+    os.close(debugger_read)
     os.kill(pid, signal.SIGKILL)
     # print communicator.executed_lines
     # print communicator.executed_code
