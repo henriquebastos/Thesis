@@ -50,7 +50,7 @@ def get_function_call_lineno(call, lineno):
                 return line
 
 
-def display_variables(variable_box, lineno):
+def display_variables(variable_box, call_num):
     global variable_scope
     global variable_values
 
@@ -75,12 +75,12 @@ def display_variables(variable_box, lineno):
         variables_line = ''
         for variable in variables:
             if func in variable_values and variable in variable_values[func]:
-                if (lineno in variable_values_per_line and
-                        func in variable_values_per_line[lineno] and
-                        variable in variable_values_per_line[lineno][func] and
-                        variable_values_per_line[lineno][func][variable] is not None):
+                if (call_num in variable_values_per_line and
+                        func in variable_values_per_line[call_num] and
+                        variable in variable_values_per_line[call_num][func] and
+                        variable_values_per_line[call_num][func][variable] is not None):
                     variables_line += '{0}={1}\n'.format(
-                        variable, variable_values_per_line[lineno][func][variable])
+                        variable, variable_values_per_line[call_num][func][variable])
                 else:
                     variables_line += '{0}={1}\n'.format(
                         variable, variable_values[func][variable])
@@ -397,13 +397,16 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                     handle_assignment_in_executed_code(value)
                 if 'print' in value:
                     output_box.insert(INSERT, value['result'] + '\n')
+                    # TODO Update this to use variable_values_per_line by looking at the value
+                    # values and comparing the key,value to value['result']
+                    # only if the value['result'] differs
                 if (value['lineno'] in data and
                         'additional_lines' in data[value['lineno']]):
                     handle_additional_lines_in_executed_code(value)
                 display_line += get_display_line_in_executed_code(value)
             else:
                 display_line = handle_functions_in_executed_code(value)
-            display_variables(variable_box, value['lineno'])
+            display_variables(variable_box, key)
 
             tab_count = handle_highlights_in_executed_code(key, value, display_map,
                                                        display_line, tab_count)
@@ -485,9 +488,7 @@ def highlight_code(code_box):
             is_def = True
         elif content == ')' and str(token) == 'Token.Punctuation':
             is_def = False
-        
-        # print '{0}: {1}\t\t{2}   {3}'.format(token, content, get_classes(), get_functions())
-        
+                
         code_box.mark_set('range_end', 'range_start + %dc' % len(content))
         if content == 'None':
             # purple
@@ -610,6 +611,24 @@ def tag_lines(code_box, executed_code_box):
         line_count += 1
 
 
+def correct_mangled_variables():
+    global executed_code
+    for call, evaluated in executed_code.iteritems():
+        scope = get_scope(evaluated['lineno'])
+        for key, value in evaluated['values'].iteritems():
+            try:
+                correct_value = variable_values_per_line[call-1][scope][key]
+                correct_result = variable_values_per_line[call][scope][key]
+                if value != correct_value:
+                    executed_code[call]['values'][key] = correct_value
+                    if value == evaluated['result']:
+                        executed_code[call]['result'] = correct_result
+                    elif evaluated['result'] == '{0}={1}'.format(key, value):
+                        executed_code[call]['result'] = '{0}={1}'.format(key, correct_result)
+            except KeyError:
+                pass
+
+
 class CommunicationThread(threading.Thread):
     def __init__(self, filename):
         threading.Thread.__init__(self)
@@ -635,6 +654,7 @@ class CommunicationThread(threading.Thread):
                 additional_lines_call_point = \
                     communicator.additional_lines_call_point
                 variable_values_per_line = communicator.variable_values
+                correct_mangled_variables()
                 reset_objects()
                 successful_exit = True
         except Exception as e:

@@ -761,11 +761,11 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 
     def _getval(self, arg):
         try:
-            if has_no_keywords(arg):
-                return eval(arg, self.curframe.f_globals,
-                            self.curframe_locals)
-            else:
-                return None
+            # if has_no_keywords(arg):
+            return eval(arg, self.curframe.f_globals,
+                        self.curframe_locals)
+            # else:
+            #     return None
             # fd_read, fd_write = os.pipe()
             # pid = os.fork()
             # if pid:  # Parent

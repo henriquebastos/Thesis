@@ -45,37 +45,46 @@ class Communicator(object):
         self.additional_lines_call_point = {}
         self.looking_for = []
 
-    def communicate(self, fd_write, fd_read, file, stop_event=None,
-                    input_event=None, user_inputs=None, pid=None):
+    def communicate(self, fd_write, fd_read, fd_write_2, fd_read_2, file, stop_event=None,
+                    input_event=None, user_inputs=None, pid=None, pid2=None):
         self.fd_write = fd_write
         self.fd_read = fd_read
+        self.fd_write_2 = fd_write_2
+        self.fd_read_2 = fd_read_2
         self.stop_event = stop_event
         self.input_event = input_event
         self.user_inputs = user_inputs
         self.data, self.variable_scope = get_expressions(file)
         lineno = 0
 
+        # print self.data['function_lines']
+        # print self.variable_scope
+
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
-            # print output
-            if lineno in self.data:
-                self.variable_values[lineno] = {}
-                for scope, variables in self.variable_scope.iteritems():
-                    self.variable_values[lineno][scope] = {}
-                    for variable in variables:
-                        os.write(self.fd_write, 'p {0}\n'.format(variable))
-                        result = os.read(self.fd_read, 1000)
-                        # print 'Examine Variable Values: {0}={1}***'.format(variable, result)
-                        # result = result.rstrip('\n(Pdb) ')[1:-1]
-                        # if '\\n' in result:
-                        #     result = result.split('\\n')[0][1:]
-                        # else:
-                        result = result.rstrip('\n(Pdb) ')
-                        # print 'Fixed Examine Variable Values: {0}={1}---'.format(variable, result)
-                        if '*** NameError' in result or '<built-in method' in result:
-                            self.variable_values[lineno][scope][variable] = None
-                        else:
-                            self.variable_values[lineno][scope][variable] = result
+            output2 = os.read(fd_read_2, 1000)
+            # if lineno in self.data:
+                # self.variable_values[lineno] = {}
+            for scope, variables in self.variable_scope.iteritems():
+                # self.variable_values[lineno][scope] = {}
+                for variable in variables:
+                    os.write(fd_write_2, 'p {0}\n'.format(variable))
+                    result = os.read(fd_read_2, 1000)
+                    # print 'Examine Variable Values: {0}={1}***'.format(variable, result)
+                    # result = result.rstrip('\n(Pdb) ')[1:-1]
+                    # if '\\n' in result:
+                    #     result = result.split('\\n')[0][1:]
+                    # else:
+                    result = result.rstrip('\n(Pdb) ')
+                    # print 'Fixed Examine Variable Values: {0}={1}---'.format(variable, result)
+                    if self.call > 0 and '*** NameError' not in result and '<built-in method' not in result:
+                        if self.call-1 not in self.variable_values:
+                            self.variable_values[self.call-1] = {}
+                        if scope not in self.variable_values[self.call-1]:
+                            self.variable_values[self.call-1][scope] = {}
+                        self.variable_values[self.call-1][scope][variable] = result
+                    # else:
+                    #     self.variable_values[lineno][scope][variable] = result
             lineno = self.parse_line(output)
             if lineno in self.data:
                 self.evaluate_line(self.data, lineno)
@@ -83,14 +92,14 @@ class Communicator(object):
                 lineno = 0
             self.executed_lines.append(lineno)
             os.write(self.fd_write, 's\n')
+            os.write(fd_write_2, 's\n')
             # Terminate on long loops
             if self.call > 1000 or self.stop_event.isSet():
-                print 'Tell child to close fds'
                 os.kill(pid, signal.SIGUSR1)
+                os.kill(pid2, signal.SIGUSR1)
                 return
-        print 'Tell child to close fds'
         os.kill(pid, signal.SIGUSR1)
-        print 'DONE AT LINENO: {0}'.format(lineno)
+        os.kill(pid2, signal.SIGUSR1)
 
     def parse_line(self, line):
         lineno = -1
@@ -149,6 +158,7 @@ class Communicator(object):
     def evaluate_assign(self, data, lineno):
         if has_user_input_call(data, lineno):
             os.write(self.fd_write, 's\n')
+            os.write(self.fd_write_2, 's\n')
             if (len(self.user_inputs) > 0 and
                     self.user_inputs_index < len(self.user_inputs)):
                 user_input = self.user_inputs[self.user_inputs_index]
@@ -164,6 +174,9 @@ class Communicator(object):
             os.write(self.fd_write, str(user_input) + '\n')
             while '--Return--' not in os.read(self.fd_read, 1000):
                 os.write(self.fd_write, 's\n')
+            os.write(self.fd_write_2, str(user_input) + '\n')
+            while '--Return--' not in os.read(self.fd_read_2, 1000):
+                os.write(self.fd_write_2, 's\n')
             result = str(user_input)
             self.setup_executed_code(lineno)
         else:
@@ -335,9 +348,26 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
     if pid:  # Parent
         os.close(communicator_read)
         os.close(debugger_write)
-        communicator = Communicator()
-        communicator.communicate(communicator_write, debugger_read, file,
-                                 stop_event, input_event, user_inputs, pid)
+
+        communicator_read_2, communicator_write_2 = os.pipe()
+        debugger_read_2, debugger_write_2 = os.pipe()
+        pid2 = os.fork()
+        if pid2:
+            os.close(communicator_read_2)
+            os.close(debugger_write_2)
+
+            communicator = Communicator()
+            communicator.communicate(communicator_write, debugger_read, communicator_write_2, debugger_read_2, file,
+                                     stop_event, input_event, user_inputs, pid, pid2)
+        else:
+            os.close(debugger_read)
+            os.close(communicator_write)
+            os.close(debugger_read_2)
+            os.close(communicator_write_2)
+            launch_child(debugger_write_2, communicator_read_2, file)
+        os.close(communicator_write_2)
+        os.close(debugger_read_2)
+        os.kill(pid2, signal.SIGKILL)
     else:  # Child
         os.close(debugger_read)
         os.close(communicator_write)
@@ -345,8 +375,13 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
     os.close(communicator_write)
     os.close(debugger_read)
     os.kill(pid, signal.SIGKILL)
+
     # print communicator.executed_lines
     # print communicator.executed_code
+    # print
+    # print communicator.variable_values
+    # print
+    # print
     for key, value in communicator.executed_code.iteritems():
         # print '{0}: Lineno: {1}'.format(key, value['lineno'])
         if 'result' in value:
