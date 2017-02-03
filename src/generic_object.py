@@ -72,6 +72,16 @@ class GenericObject:
         children.reverse()
         return children
 
+    def get_name(self):
+        names = None
+        for name in self.name:
+            if '.' not in name:
+                if names is None:
+                    names = name
+                else:
+                    names += ',{0}'.format(name)
+        return names
+
     
     # def insert(self, name, variables, functions):  
     #     self.generic_object = self.generic_object.insert(name, variables, functions)

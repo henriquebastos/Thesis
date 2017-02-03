@@ -11,8 +11,10 @@ print a2
 print 1
 a4 = [1, 2, 3, 4]
 a4.append(5)
+f_ = a4.append
 print a4
-
+f_(6)
+print a4
 
 class Node():
    def __init__(self):
@@ -35,7 +37,9 @@ class really_long_name():
    def __init__(self):
       self.v = None
 
+n8 = Node()
 n = Node()
+n7 = Node()
 n.center = Node()
 n.left_center = Node()
 n.right_center = Node()
@@ -68,7 +72,16 @@ def mult(x,y):
    z = x * y
    return z
 
+def f():
+   print a
+
+def g():
+   a = 3
+   print 3
+
 a = 1
+f()
+g()
 b = 2
 c = sum(a,b)
 print c
@@ -98,4 +111,4 @@ print user_input
 print user_input + 1
 user_input2 = input()
 print user_input2
-print a
+

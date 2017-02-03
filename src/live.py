@@ -1,4 +1,5 @@
 from Tkinter import *
+from tkinter import ttk
 import tkFileDialog
 import os
 import ScrolledText as ST
@@ -41,13 +42,27 @@ generic_objects = {}
 current_object_lines = []
 current_generic_object = None
 current_function = None
-
+selected_object = StringVar()
+root_objects = None
 
 def get_function_call_lineno(call, lineno):
     for line, values in additional_lines_call_point.iteritems():
         for additional_line, additional_call in values.iteritems():
             if lineno == additional_line and call == additional_call:
                 return line
+
+
+def variable_declared_in_scope(variable, function, function_lines):
+    if function == 'global':
+        return True
+    else:
+        for line in function_lines:
+            if ('type' in data[line] and ('func' == data[line]['type'] or
+                    ('assign' == data[line]['type'] and
+                    variable in data[line]['assigned']))):
+                return True
+    return False
+
 
 
 def display_variables(variable_box, call_num):
@@ -72,13 +87,19 @@ def display_variables(variable_box, call_num):
 
     variable_box.delete(0.0, END)
     for func, variables in variable_scope.items():
+        func_lines = None
+        if func in data['function_lines']:
+            func_lines = data['function_lines'][func]
         variables_line = ''
         for variable in variables:
-            if func in variable_values and variable in variable_values[func]:
+            if (func in variable_values and variable in variable_values[func] and
+                variable_declared_in_scope(variable, func, func_lines)):
+
                 if (call_num in variable_values_per_line and
                         func in variable_values_per_line[call_num] and
                         variable in variable_values_per_line[call_num][func] and
                         variable_values_per_line[call_num][func][variable] is not None):
+                    
                     result = variable_values_per_line[call_num][func][variable]
                     if 'instance' in result and '.' in result:
                         variables_line += '{0}={1}\n'.format(
@@ -438,12 +459,21 @@ def get_functions():
     return functions
 
 
-def display_objects(tree_wrapper, tree_viewer):
-    tree_viewer.clearTree()
+def display_tree(event, combobox, tree_viewer):
+    for obj in root_objects:
+        if selected_object.get() in obj.generic_object.name:
+            tree_viewer.clearTree()
+            obj.view()
+    combobox.selection_clear()
+
+
+def display_objects(tree_wrapper, tree_viewer, combobox):
+    global root_objects
     tree_wrapper.generic_objects = generic_objects
     tree_wrapper.classes = get_classes()
     trees = []
-    root_obj = None
+    root_objects_names = []
+    root_objects = []
 
     for obj in generic_objects.values():
         trees.append(treeview.GenericTree(tree_viewer, obj))
@@ -458,9 +488,9 @@ def display_objects(tree_wrapper, tree_viewer):
             else:
                 this_tree = tree
         if not appears_as_child:
-            root_obj = this_tree
-    if root_obj is not None:
-        root_obj.view()
+            root_objects_names.append(this_tree.generic_object.get_name())
+            root_objects.append(this_tree)
+    combobox['values'] = tuple(root_objects_names)
 
 
 def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
@@ -711,7 +741,7 @@ def input_box_has_changes(input_box):
 
 def debug_loop(from_box, executed_code_box, input_box, variable_box,
                output_box, start_scale, scale, scrolled_text_pair,
-               tree_wrapper, tree_viewer):
+               tree_wrapper, tree_viewer, combobox):
     global user_code
     global scale_size
     global executed_code
@@ -758,7 +788,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         display_executed_code(executed_code, from_box, executed_code_box,
                               variable_box, output_box, start_scale.get(),
                               scale.get())
-        display_objects(tree_wrapper, tree_viewer)
+        display_objects(tree_wrapper, tree_viewer, combobox)
         if scroll_position is not None:
             scrolled_text_pair.right.configure(
                 yscrollcommand=scrolled_text_pair.on_textscroll)
@@ -781,7 +811,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
             display_executed_code(executed_code, from_box, executed_code_box,
                                   variable_box, output_box, start_scale.get(),
                                   scale_size)
-            display_objects(tree_wrapper, tree_viewer)
+            display_objects(tree_wrapper, tree_viewer, combobox)
             highlight_code(from_box)
             if scroll_position is not None:
                 scrolled_text_pair.right.configure(
@@ -809,7 +839,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
 
     root.after(500, debug_loop, from_box, executed_code_box, input_box,
                variable_box, output_box, start_scale, scale,
-               scrolled_text_pair, tree_wrapper, tree_viewer)
+               scrolled_text_pair, tree_wrapper, tree_viewer, combobox)
 
 
 class ScrolledTextPair(Frame):
@@ -973,13 +1003,18 @@ class Application(Frame):
 
         tree_frame_title = Label(tree_frame, text='Objects')
         tree_frame_title.pack(side=TOP, fill=X)
+        combobox = ttk.Combobox(tree_frame, textvariable=selected_object)
+        combobox['state'] = 'readonly'
+        combobox.pack()
         tree_wrapper = treeview.GenericObjectWrapper()
-        tree_viewer = TreeViewer(tree_wrapper, tree_frame) 
+        tree_viewer = TreeViewer(tree_wrapper, tree_frame)
+        combobox.bind('<<ComboboxSelected>>', lambda event, cb=combobox,
+                        tv=tree_viewer: display_tree(event, cb, tv))
 
         root.after(500, debug_loop, code_box, executed_code_box, input_box,
                    variable_box, output_box, start_execution_step,
                    execution_step, paired_text_boxes, tree_wrapper,
-                   tree_viewer)
+                   tree_viewer, combobox)
 
     def __init__(self, master=None):
         Frame.__init__(self, master)

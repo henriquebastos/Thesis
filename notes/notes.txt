@@ -1,81 +1,19 @@
-loops (Solution one finish after 1000 steps, )
-drag/drop
 UI
-other data type visuals
-classes / objects
 how to relate errors to the user
 validation
 comment highlights are broken
 duplicate function/class names in the file will cause issues
-multiple code files
-threading for analysis
-handling arrays/lists/python objects to multiple variables yet all are updated
+update input read on boot 
 
-***FOR VARIABLE SCOPE
-
-a = 2
-
-def f():
-   print a
-
-def g():
-   a = 3
-   print 3
+state of project 
 
 
-GLOBAL:
-a = 2
+*** Possible additions ***
+- when hovering over left side code, move the right box info into view
+- threading for analysis
+- multiple code files
+- drag/drop
 
-f:
-a : Don't ever
-
-g: a = 3
-
-
-*** CLASSES ***
+*** No known issues ***
 - class name --> class lines
 Class scopes --> walk_ast.py line 118
-
-
-- Executed Code box:
-   + Ignore self variables
-   - class instantiation should only say name of class, not returning output of the object
-   + class instantiation should highlight the init method
-   + class method calls need highlight fix
-
-- Variable Box:
-   - Object creation for class needs to be created
-      - Class Name, Class variables, Class methods when called
-   - Classes can have multiple instances
-   - If object variable points to another object then variable box should merely indent that Node
-      - Need a drawable section with arrows
-      - Need better solution
-      - For now, create objects that can't point to other objects
-
-- IDEA: When hovering over a class/object, it displays the variables for that class/object
-
-
-For code:
-class Node():
-   def __init__(self):
-      self.value = None
-      self.left = None
-      self.right = None
-
-   def set_value(self, v):
-      self.value = v
-
-   def get_value(self):
-      return self.value
-
-n = Node()
-
-VARIABLE BOX (should be):
-n = Node()
-   Variables:
-   - Node.value = 1
-   - Node.left = None
-   - Node.right = None
-   Methods: (Only appear when called)
-   - set_value:
-      - v = 1

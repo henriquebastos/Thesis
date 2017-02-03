@@ -824,7 +824,6 @@ if __name__ == '__main__':
     print ast.dump(tree)
     walker = WalkAST()
     walker.visit(tree)
-    print
     walker.print_map()
     print '\nVARIABLE SCOPE:'
     for key, value in walker.variable_scope.items():
