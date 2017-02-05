@@ -60,8 +60,8 @@ class Communicator(object):
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
             output2 = os.read(fd_read_2, 1000)
-            self.evaluate_variable_values()
             lineno = self.parse_line(output)
+            self.evaluate_variable_values(lineno)
             if lineno in self.data:
                 self.evaluate_line(self.data, lineno)
             if lineno == -2:
@@ -77,18 +77,29 @@ class Communicator(object):
         os.kill(pid, signal.SIGUSR1)
         os.kill(pid2, signal.SIGUSR1)
 
-    def evaluate_variable_values(self):
+    def in_correct_scope(self, scope, lineno):
+        if scope == 'global' and 'function_lines' in self.data:
+            for func,lines in self.data['function_lines'].iteritems():
+                if lineno in lines:
+                    return False
+            return True
+        return ('function_lines' in self.data and
+            scope in self.data['function_lines'] and
+            lineno in self.data['function_lines'][scope])
+
+    def evaluate_variable_values(self, lineno):
         for scope, variables in self.variable_scope.iteritems():
-            for variable in variables:
-                os.write(self.fd_write_2, 'p {0}\n'.format(variable))
-                result = os.read(self.fd_read_2, 1000)
-                result = result.rstrip('\n(Pdb) ')
-                if self.call > 0 and '*** NameError' not in result and '<built-in method' not in result:
-                    if self.call-1 not in self.variable_values:
-                        self.variable_values[self.call-1] = {}
-                    if scope not in self.variable_values[self.call-1]:
-                        self.variable_values[self.call-1][scope] = {}
-                    self.variable_values[self.call-1][scope][variable] = result
+            if self.in_correct_scope(scope, lineno):
+                for variable in variables:
+                    os.write(self.fd_write_2, 'p {0}\n'.format(variable))
+                    result = os.read(self.fd_read_2, 1000)
+                    result = result.rstrip('\n(Pdb) ')
+                    if self.call > 0 and '*** NameError' not in result and '<built-in method' not in result:
+                        if self.call-1 not in self.variable_values:
+                            self.variable_values[self.call-1] = {}
+                        if scope not in self.variable_values[self.call-1]:
+                            self.variable_values[self.call-1][scope] = {}
+                        self.variable_values[self.call-1][scope][variable] = result
 
     def parse_line(self, line):
         lineno = -1

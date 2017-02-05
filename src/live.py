@@ -84,6 +84,9 @@ def display_variables(variable_box, call_num):
     # print 'Generic Objects:'
     # for k,v in generic_objects.items():
     #     print '\t{0}: {1}'.format(k,v)
+    # print 'Variable Values Per Line:'
+    # for k,v in variable_values_per_line.items():
+    #     print '\t{0}: {1}'.format(k,v)
 
     variable_box.delete(0.0, END)
     for func, variables in variable_scope.items():
