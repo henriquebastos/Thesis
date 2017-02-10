@@ -56,7 +56,14 @@ class WalkAST(ast.NodeVisitor):
     # Module(stmt* body)
     def visit_Module(self, node):
         print 'Module'
-        self.generic_visit(node)
+        for stmt in node.body:
+            walker = walk_ast(stmt, self.current_scope)
+            utils.add_string_to_data(stmt.lineno, walker.data,
+                                     walker.line)
+            utils.combine_all_data(self.data, walker.data)
+            utils.combine_variable_scopes(self.variable_scope,
+                                          walker.variable_scope)
+        # self.generic_visit(node)
 
     # Interactive(stmt* body)
     def visit_Interactive(self, node):
@@ -131,6 +138,9 @@ class WalkAST(ast.NodeVisitor):
         utils.set_type(self.data, node.lineno, 'return')
         if node.value is not None:
             walker = walk_ast_for_expr(node.value, self.current_scope)
+            print walker.data
+            print self.data
+            print walker.line
             utils.combine_data(node.lineno, self.data, walker.data)
             utils.add_string_to_data(node.lineno, self.data, walker.line)
             utils.combine_variable_scopes(self.variable_scope,
@@ -480,7 +490,7 @@ class WalkAST(ast.NodeVisitor):
             utils.combine_data(node.lineno, self.data, func_walker.data)
             utils.combine_variable_scopes(self.variable_scope,
                                           func_walker.variable_scope)
-        self.line = func_walker.line + '('
+        self.line += func_walker.line + '('
         first_arg = True
         for arg in node.args:
             arg_walker = walk_ast_for_expr(arg, self.current_scope)

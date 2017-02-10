@@ -1,5 +1,6 @@
 from Tkinter import *
 from tkinter import ttk
+from tkMessageBox import showinfo
 import tkFileDialog
 import os
 import ScrolledText as ST
@@ -109,7 +110,7 @@ def display_variables(variable_box, call_num):
                             variable, variable_values[func][variable])
                     else:
                         variables_line += '{0}={1}\n'.format(
-                            variable, variable_values_per_line[call_num][func][variable])
+                            variable, result)
                 else:
                     variables_line += '{0}={1}\n'.format(
                         variable, variable_values[func][variable])
@@ -129,7 +130,7 @@ def get_scope(lineno):
     return 'global'
 
 
-def set_variable_value(scope, variable, result):
+def set_variable_value(scope, variable, result, call_num):
     global variable_values
     if scope not in variable_values:
         variable_values[scope] = {}
@@ -207,8 +208,8 @@ def check_add_to_object(scope, variable, result, lineno):
                 if 'instance at' in result and '.' in result:
                     class_name = result.split('=')[1].split(' instance')[0].split('.')[1]
                     instance_id = result.split(' instance at ')[1].split('>')[0]
-                    obj = get_object(instance_id)
-                    simple_id = obj.simple_id
+                    added_obj = get_object(instance_id)
+                    simple_id = added_obj.simple_id
                     obj.add_variable(variable, result, class_name, simple_id)
                 else:
                     obj.add_variable(variable, result)
@@ -249,7 +250,7 @@ def check_function_variables_arguments(lineno, values):
                 current_generic_object.add_function_variable(current_function, k, v)
 
 
-def handle_assignment_in_executed_code(value):
+def handle_assignment_in_executed_code(value, call_num):
     scope = get_scope(value['lineno'])
     variable = value['result'].split('=')[0]
     result = value['result'].split('=')[1]
@@ -259,7 +260,7 @@ def handle_assignment_in_executed_code(value):
                             value['lineno'])
     else:
         check_modify_object(variable, value['result'], value['lineno'])
-    set_variable_value(scope, variable, result)
+    set_variable_value(scope, variable, result, call_num)
 
 
 def handle_additional_lines_in_executed_code(value):
@@ -305,7 +306,7 @@ def get_display_line_in_executed_code(value):
         return '{0}'.format(value['result'])
 
 
-def handle_functions_in_executed_code(value):
+def handle_functions_in_executed_code(value, call_num):
     display_line = ''
     no_comma = True
     scope = get_scope(value['lineno'])
@@ -315,7 +316,7 @@ def handle_functions_in_executed_code(value):
         else:
             display_line += ', '
         display_line += '{0}={1}'.format(k, v)
-        set_variable_value(scope, k, v)
+        set_variable_value(scope, k, v, call_num)
     check_function_variables_arguments(value['lineno'], value['values'])
     return display_line
 
@@ -412,29 +413,20 @@ def display_executed_code(executed_code, code_box, executed_code_box,
     highlight_map = {}
     display_map = {}
     tab_count = 0
-    # print data
-    # print variable_scope
-    # print
-    # print variable_values_per_line
-    # print
     for key, value in executed_code.iteritems():
-        # print '{0}: {1}'.format(key, value)
         display_line = ''
         if total >= 0 and start <= 0:
             if 'result' in value:
                 if 'assigned' in value:
-                    handle_assignment_in_executed_code(value)
+                    handle_assignment_in_executed_code(value, key)
                 if 'print' in value:
                     output_box.insert(INSERT, value['result'] + '\n')
-                    # TODO Update this to use variable_values_per_line by looking at the value
-                    # values and comparing the key,value to value['result']
-                    # only if the value['result'] differs
                 if (value['lineno'] in data and
                         'additional_lines' in data[value['lineno']]):
                     handle_additional_lines_in_executed_code(value)
                 display_line += get_display_line_in_executed_code(value)
             else:
-                display_line = handle_functions_in_executed_code(value)
+                display_line = handle_functions_in_executed_code(value, key)
             display_variables(variable_box, key)
 
             tab_count = handle_highlights_in_executed_code(key, value, display_map,
@@ -479,20 +471,27 @@ def display_objects(tree_wrapper, tree_viewer, combobox):
     root_objects = []
 
     for obj in generic_objects.values():
-        trees.append(treeview.GenericTree(tree_viewer, obj))
-    for instance_id in generic_objects.keys():
-        appears_as_child = False
-        this_tree = None
-        for tree in trees:
-            if instance_id != tree.generic_object.instance_id:
-                for value in tree.generic_object.object_variables.values():
-                    if instance_id in value:
-                        appears_as_child = True
-            else:
-                this_tree = tree
-        if not appears_as_child:
-            root_objects_names.append(this_tree.generic_object.get_name())
-            root_objects.append(this_tree)
+        tree = treeview.GenericTree(tree_viewer, obj)
+        trees.append(tree)
+        name = obj.get_name()
+        if name is not None:
+            root_objects.append(tree)
+            root_objects_names.append(name)
+    # for instance_id in generic_objects.keys():
+    #     appears_as_child = False
+    #     this_tree = None
+    #     for tree in trees:
+    #         if len(tree.generic_object.name) == 0:
+    #             this_tree = tree
+    #         elif instance_id != tree.generic_object.instance_id:
+    #             for value in tree.generic_object.object_variables.values():
+    #                 if instance_id in value:
+    #                     appears_as_child = True
+    #         else:
+    #             this_tree = tree
+    #     if not appears_as_child:
+    #         root_objects_names.append(this_tree.generic_object.get_name())
+    #         root_objects.append(this_tree)
     combobox['values'] = tuple(root_objects_names)
 
 
@@ -624,13 +623,10 @@ def tag_lines(code_box, executed_code_box):
                     name = name.split('.')[-1]
 
                 if 'function_lines' in data and name in data['function_lines']:
-                    for func_line in data['function_lines'][name]:
-                        additional_lines.append(func_line)
+                    additional_lines.extend(data['function_lines'][name])
                 elif ('classes' in data and name in data['classes'] and
                         '__init__' in data['classes'][name]['functions']):
-                    for func_line in data['classes'][name]['functions']['__init__']:
-                        additional_lines.append(func_line)
-
+                    additional_lines.extend(data['classes'][name]['functions']['__init__'])
         code_box.tag_bind(
             'line{0}'.format(line_count),
             '<Enter>',
@@ -703,12 +699,11 @@ class CommunicationThread(threading.Thread):
         self.stop_event.set()
 
 
-def check_for_new_input(input_box):
+def check_for_new_input(lines):
     global user_inputs
     # By removing the last line split, this forces the user to hit enter after
     # each of their line inputs. Leaving an empty line at the bottom of the
     # input box
-    lines = str(input_box.get(0.0, END)[:-1]).split('\n')[:-1]
     if len(lines) > len(user_inputs):
         if lines[len(user_inputs)] != '':
             user_inputs.append(lines[len(user_inputs)])
@@ -719,10 +714,9 @@ def check_for_new_input(input_box):
                 input_file.close()
 
 
-def input_box_has_changes(input_box):
+def input_box_has_changes(lines):
     global user_inputs
     has_changed = False
-    lines = str(input_box.get(0.0, END)[:-1]).split('\n')[:-1]
     if len(user_inputs) > len(lines):
         while len(user_inputs) > len(lines):
             del user_inputs[len(user_inputs) - 1]
@@ -752,6 +746,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
     global prev_start_scale_setting
     global communicationThread
     global input_event
+    global successful_exit
     global scroll_position
     global rerun_event
 
@@ -764,7 +759,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         scroll_position = scrolled_text_pair.scrollbar.get()
         scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
         highlight_code(from_box)
-        tag_lines(from_box, executed_code_box)
+        # tag_lines(from_box, executed_code_box)
         # user_code = new_user_code
         # with open(FILE_NAME, "w") as code_file:
         #     code_file.write(user_code)
@@ -802,6 +797,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         input_event.clear()
         communicationThread = None
         if successful_exit:
+            successful_exit = False
             reset_boxes(new_user_code, executed_code_box, variable_box,
                         output_box)
             tag_lines(from_box, executed_code_box)
@@ -815,7 +811,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
                                   variable_box, output_box, start_scale.get(),
                                   scale_size)
             display_objects(tree_wrapper, tree_viewer, combobox)
-            highlight_code(from_box)
+            # highlight_code(from_box)
             if scroll_position is not None:
                 scrolled_text_pair.right.configure(
                     yscrollcommand=scrolled_text_pair.on_textscroll)
@@ -823,9 +819,10 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
                 scroll_position = None
 
     # Check for new input
-    check_for_new_input(input_box)
+    lines = str(input_box.get(0.0, END)[:-1]).split('\n')[:-1]
+    check_for_new_input(lines)
 
-    if input_box_has_changes(input_box):
+    if input_box_has_changes(lines):
         # If a thread is running, kill the thread and set the rerun flag.
         # Else rerun the user's code right away.
         if communicationThread is not None and communicationThread.isAlive():
@@ -900,14 +897,12 @@ class ScrolledTextPair(Frame):
 
     def on_scrollbar(self, *args):
         '''Scrolls both text widgets when the scrollbar is moved'''
-        # print args
         self.left.yview(*args)
         self.right.yview(*args)
 
     def on_textscroll(self, *args):
         '''Moves the scrollbar and scrolls text widgets when the mousewheel
         is moved on a text widget'''
-        # print args
         self.scrollbar.set(*args)
         self.on_scrollbar('moveto', args[0])
 
@@ -991,6 +986,7 @@ class Application(Frame):
                 lines = input_file.readlines()
                 for line in lines:
                     input_box.insert(INSERT, line)
+                    user_inputs.append(line[:-1])
                 input_file.close()
 
         variable_title = Label(variable_frame, text='Variables')

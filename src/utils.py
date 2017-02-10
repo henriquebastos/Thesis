@@ -83,20 +83,20 @@ def add_variables_to_class(target_data, from_variable_scope, classname):
 
 
 def combine_expressions(lineno, target_data, from_data):
-    if 'expressions' in from_data[lineno]:
+    if lineno in from_data and 'expressions' in from_data[lineno]:
         for s in from_data[lineno]['expressions']:
             add_string(target_data, lineno, s)
 
 
 def combine_type(lineno, target_data, from_data):
-    if 'type' in from_data[lineno]:
+    if lineno in from_data and 'type' in from_data[lineno]:
         target_data[lineno]['type'] = from_data[lineno]['type']
 
 
 def combine_assigned(lineno, target_data, from_data):
-    if 'assigned' in from_data[lineno]:
+    if lineno in from_data and 'assigned' in from_data[lineno]:
         target_data[lineno]['assigned'] = from_data[lineno]['assigned']
-    if 'assigned_expressions' in from_data[lineno]:
+    if lineno in from_data and 'assigned_expressions' in from_data[lineno]:
         target_data[lineno]['assigned_expressions'] = from_data[lineno]['assigned_expressions']
 
 
@@ -111,9 +111,19 @@ def combine_function_lines(lineno, target_data, from_data):
 
 
 def combine_additional_lines(lineno, target_data, from_data):
-    if 'additional_lines' in from_data[lineno]:
+    if lineno in from_data and 'additional_lines' in from_data[lineno]:
         target_data[lineno]['additional_lines'] = \
             from_data[lineno]['additional_lines']
+
+
+def combine_classes(lineno, target_data, from_data):
+    if 'classes' in from_data:
+        if 'classes' not in target_data:
+            target_data['classes'] = from_data['classes']
+        else:
+            for func, lines in from_data['classes'].items():
+                if func not in target_data['classes']:
+                    target_data['classes'][func] = lines
 
 
 def combine_data(lineno, target_data, from_data):
@@ -123,6 +133,7 @@ def combine_data(lineno, target_data, from_data):
     combine_assigned(lineno, target_data, from_data)
     combine_function_lines(lineno, target_data, from_data)
     combine_additional_lines(lineno, target_data, from_data)
+    combine_classes(lineno, target_data, from_data)
 
 
 def combine_all_data(target_data, from_data):
@@ -132,7 +143,7 @@ def combine_all_data(target_data, from_data):
 
 def combine_target_data(lineno, data, from_data):
     setup_data(data, lineno)
-    if 'targets' in from_data[lineno]:
+    if lineno in from_data and 'targets' in from_data[lineno]:
         if 'targets' not in data[lineno]:
             data[lineno]['targets'] = []
         for target in from_data[lineno]['targets']:

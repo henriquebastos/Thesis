@@ -78,6 +78,7 @@ class TreeViewer(Frame):
         self.drawLevels(levels, maxrow, wrapper)
 
     def planLevels(self, root, wrap):
+        used_nodes = [root.instance_id]
         levels = []
         maxrow = 0                                       # traverse tree to 
         currlevel = [(root, None)]                       # layout rows, cols
@@ -94,7 +95,11 @@ class TreeViewer(Frame):
                         nextlevel.append((None, None))         # leave a hole
                     else:
                         for child in children:
-                            nextlevel.append((child, node))    # parent link
+                            if child.instance_id not in used_nodes:
+                                nextlevel.append((child, node))    # parent link
+                                used_nodes.append(child.instance_id)
+                            else:
+                                nextlevel.append((child.instance_id, node))
             currlevel = nextlevel
         return levels, maxrow
 
@@ -104,6 +109,15 @@ class TreeViewer(Frame):
                 return k
         return ''
 
+    def get_node(self, instance_id, levels):
+        for level in levels:
+            for (node, parent) in level:
+                if parent is not None and instance_id == parent.instance_id:
+                    return parent
+                if node is not None and instance_id == node.instance_id:
+                    return node
+        return None
+
     def drawLevels(self, levels, maxrow, wrap):
         rowpos = 0                                         # draw tree per plan
         for level in levels:                               # set click handlers
@@ -111,6 +125,8 @@ class TreeViewer(Frame):
             colpos = 0
             for (node, parent) in level:
                 colpos = colpos + colinc
+                if isinstance(node, str):
+                    node = self.get_node(node, levels)
                 if node != None:
                     text = wrap.label(node)
                     win = Label(self.canvas, text=text, 
