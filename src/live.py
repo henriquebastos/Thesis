@@ -46,6 +46,9 @@ current_function = None
 selected_object = StringVar()
 root_objects = None
 
+DO_NOT_RUN = False
+display_map = {}
+
 def get_function_call_lineno(call, lineno):
     for line, values in additional_lines_call_point.iteritems():
         for additional_line, additional_call in values.iteritems():
@@ -299,10 +302,16 @@ def get_display_line_in_executed_code(value):
             class_name = result.split(' instance')[0].split('.')[1]
             instance_id = result.split(' instance at ')[1].split('>')[0]
             obj = get_object(instance_id)
-            return '{0}={1}_{2}'.format(variable, class_name, obj.simple_id)
+            # return '{0}={1}_{2}'.format(variable, class_name, obj.simple_id)
+            return '{1}_{2}'.format(variable, class_name, obj.simple_id)
         except:
+            # return '{0}'.format(value['result'])
+            if '=' in value['result']:
+                value['result'] = value['result'].split('=')[1]
             return '{0}'.format(value['result'])
     else:
+        if '=' in value['result']:
+            value['result'] = value['result'].split('=')[1]
         return '{0}'.format(value['result'])
 
 
@@ -381,27 +390,27 @@ def add_tags_to_executed_code(executed_code_box, code_box):
         if calling_line is not None:
             calling_lines.append(calling_line)
         highlight_executed_code(executed_code_box, value)
-        executed_code_box.tag_add('call{0}'.format(key),
-                                  '{0}.{1}'.format(value['lineno'],
-                                                   value['start']),
-                                  '{0}.{1}'.format(value['lineno'],
-                                                   value['end']))
-        executed_code_box.tag_bind(
-            'call{0}'.format(key),
-            '<Enter>',
-            lambda event, widget=executed_code_box, lineno=value['lineno'],
-            line_start=value['start'], line_length=value['end'],
-            opt_widget=code_box, lines=calling_lines:
-                add_highlight(event, widget, lineno, line_start,
-                              line_length, opt_widget, lines))
-        executed_code_box.tag_bind(
-            'call{0}'.format(key),
-            '<Leave>',
-            lambda event, widget=executed_code_box, lineno=value['lineno'],
-            line_start=value['start'], line_length=value['end'],
-            opt_widget=code_box, lines=calling_lines:
-                remove_highlight(event, widget, lineno, line_start,
-                                 line_length, opt_widget, lines))
+        # executed_code_box.tag_add('call{0}'.format(key),
+        #                           '{0}.{1}'.format(value['lineno'],
+        #                                            value['start']),
+        #                           '{0}.{1}'.format(value['lineno'],
+        #                                            value['end']))
+        # executed_code_box.tag_bind(
+        #     'call{0}'.format(key),
+        #     '<Enter>',
+        #     lambda event, widget=executed_code_box, lineno=value['lineno'],
+        #     line_start=value['start'], line_length=value['end'],
+        #     opt_widget=code_box, lines=calling_lines:
+        #         add_highlight(event, widget, lineno, line_start,
+        #                       line_length, opt_widget, lines))
+        # executed_code_box.tag_bind(
+        #     'call{0}'.format(key),
+        #     '<Leave>',
+        #     lambda event, widget=executed_code_box, lineno=value['lineno'],
+        #     line_start=value['start'], line_length=value['end'],
+        #     opt_widget=code_box, lines=calling_lines:
+        #         remove_highlight(event, widget, lineno, line_start,
+        #                          line_length, opt_widget, lines))
 
 
 def display_executed_code(executed_code, code_box, executed_code_box,
@@ -410,6 +419,7 @@ def display_executed_code(executed_code, code_box, executed_code_box,
     global current_generic_object
     global current_object_lines
     global current_function
+    global display_map
     highlight_map = {}
     display_map = {}
     tab_count = 0
@@ -435,8 +445,8 @@ def display_executed_code(executed_code, code_box, executed_code_box,
         start -= 1
         # tab_count = handle_highlights_in_executed_code(key, value, display_map,
         #                                                display_line, tab_count)
-    for key, value in display_map.iteritems():
-        executed_code_box.insert(float(key), value)
+    # for key, value in display_map.iteritems():
+    #     executed_code_box.insert(float(key), value)
     add_tags_to_executed_code(executed_code_box, code_box)
 
 
@@ -549,45 +559,35 @@ def highlight_code(code_box):
 
 
 def tag_add_highlight(widget, line, start, length):
+    global DO_NOT_RUN
+    DO_NOT_RUN = True
     widget.tag_add('HIGHLIGHT', '{0}.{1}'.format(line, start),
                    '{0}.{1}'.format(line, length))
+    if line in display_map:
+        widget.insert('{0}.{1}'.format(line, length), '     {0}'.format(display_map[line].lstrip(' ')))
 
 
 def tag_remove_highlight(widget, line, start, length):
+    global DO_NOT_RUN
     widget.tag_remove('HIGHLIGHT', '{0}.{1}'.format(line, start),
                       '{0}.{1}'.format(line, length))
+    widget.delete('{0}.{1}'.format(line, length), '{0}.end'.format(line))
+    DO_NOT_RUN = False
 
 
 def optional_add_highlights(widget, lineno, line_start, line_length,
                             lines=None):
-    tag_add_highlight(widget, lineno, 0, 'end')
     if lines is not None:
         for line in lines:
-            if (lineno in additional_lines_call_point and
-                    line in additional_lines_call_point[lineno]):
-                call = additional_lines_call_point[lineno][line]
-                if call in highlight_map:
-                    start = highlight_map[call]['start']
-                    end = highlight_map[call]['end']
-                    tag_add_highlight(widget, line, start, end)
-            else:
-                tag_add_highlight(widget, line, 0, 'end')
-
+            end = len(user_code.split('\n')[line-1])
+            tag_add_highlight(widget, line, 0, end)
 
 def optional_remove_highlights(widget, lineno, line_start, line_length,
                                lines=None):
-    tag_remove_highlight(widget, lineno, 0, 'end')
     if lines is not None:
         for line in lines:
-            if (lineno in additional_lines_call_point and
-                    line in additional_lines_call_point[lineno]):
-                call = additional_lines_call_point[lineno][line]
-                if call in highlight_map:
-                    start = highlight_map[call]['start']
-                    end = highlight_map[call]['end']
-                    tag_remove_highlight(widget, line, start, end)
-            else:
-                tag_remove_highlight(widget, line, 0, 'end')
+            end = len(user_code.split('\n')[line-1])
+            tag_remove_highlight(widget, line, 0, end)
 
 
 def add_highlight(event, widget, lineno, line_start, line_length,
@@ -604,6 +604,13 @@ def remove_highlight(event, widget, lineno, line_start, line_length,
     if opt_widget is not None:
         optional_remove_highlights(opt_widget, lineno, line_start, line_length,
                                    lines)
+
+
+def tag_add_code(event, widget, line):
+    if len(widget.get('{0}.0'.format(line), '{0}.end'.format(line))) > 1:
+        widget.delete('{0}.0'.format(line), '{0}.end'.format(line))
+    else:
+        widget.insert('{0}.end'.format(line), '     {0}'.format(display_map[line]))
 
 
 def tag_lines(code_box, executed_code_box):
@@ -633,14 +640,19 @@ def tag_lines(code_box, executed_code_box):
             lambda event, widget=code_box, lineno=line_count,
             line_length=len(line), opt_widget=executed_code_box,
             lines=additional_lines: add_highlight(
-                event, widget, lineno, 0, line_length, opt_widget, lines))
+                event, widget, lineno, 0, line_length, widget, lines))
         code_box.tag_bind(
             'line{0}'.format(line_count),
             '<Leave>',
             lambda event, widget=code_box, lineno=line_count,
             line_length=len(line), opt_widget=executed_code_box,
             lines=additional_lines: remove_highlight(
-                event, widget, lineno, 0, line_length, opt_widget, lines))
+                event, widget, lineno, 0, line_length, widget, lines))
+        code_box.tag_bind(
+            'line{0}'.format(line_count),
+            '<Button-1>',
+            lambda event, widget=executed_code_box, lineno=line_count:
+            tag_add_code(event, widget, lineno))
 
         line_count += 1
 
@@ -692,6 +704,7 @@ class CommunicationThread(threading.Thread):
                 reset_objects()
                 successful_exit = True
         except Exception as e:
+            print 'ERROR ERROR ERROR'
             successful_exit = False
             self.stop()
 
@@ -752,90 +765,90 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
 
     if exit_event.isSet():
         return
+    if not DO_NOT_RUN:
+        new_user_code = from_box.get(0.0, END)[:-1]
 
-    new_user_code = from_box.get(0.0, END)[:-1]
-
-    if user_code != new_user_code:
-        scroll_position = scrolled_text_pair.scrollbar.get()
-        scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
-        highlight_code(from_box)
-        # tag_lines(from_box, executed_code_box)
-        # user_code = new_user_code
-        # with open(FILE_NAME, "w") as code_file:
-        #     code_file.write(user_code)
-        try:
-            if communicationThread is None:
-                user_code = new_user_code
-                with open(FILE_NAME, "w") as code_file:
-                    code_file.write(user_code)
-                    code_file.close()
-                communicationThread = CommunicationThread('user_code.py')
-                communicationThread.start()
-        except:
-            pass
-    # elif scale.get() < scale_size or scale.get() != prev_scale_setting:
-    elif (scale.get() != prev_scale_setting or 
-            start_scale.get() != prev_start_scale_setting):
-        scroll_position = scrolled_text_pair.scrollbar.get()
-        scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
-        prev_scale_setting = scale.get()
-        start_scale.config(to=prev_scale_setting)
-        prev_start_scale_setting = start_scale.get()
-        reset_boxes(new_user_code, executed_code_box, variable_box, output_box)
-        reset_objects()
-        display_executed_code(executed_code, from_box, executed_code_box,
-                              variable_box, output_box, start_scale.get(),
-                              scale.get())
-        display_objects(tree_wrapper, tree_viewer, combobox)
-        if scroll_position is not None:
-            scrolled_text_pair.right.configure(
-                yscrollcommand=scrolled_text_pair.on_textscroll)
-            scrolled_text_pair.right.yview('moveto', scroll_position[0])
-            scroll_position = None
-
-    if communicationThread is not None and not communicationThread.isAlive():
-        input_event.clear()
-        communicationThread = None
-        if successful_exit:
-            successful_exit = False
-            reset_boxes(new_user_code, executed_code_box, variable_box,
-                        output_box)
-            tag_lines(from_box, executed_code_box)
-            scale_size = len(executed_code)
-            scale.config(to=scale_size)
-            scale.set(scale_size)
-            prev_scale_setting = scale_size
-            start_scale.config(to=scale_size)
+        if user_code != new_user_code:
+            scroll_position = scrolled_text_pair.scrollbar.get()
+            scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
+            highlight_code(from_box)
+            # tag_lines(from_box, executed_code_box)
+            # user_code = new_user_code
+            # with open(FILE_NAME, "w") as code_file:
+            #     code_file.write(user_code)
+            try:
+                if communicationThread is None:
+                    user_code = new_user_code
+                    with open(FILE_NAME, "w") as code_file:
+                        code_file.write(user_code)
+                        code_file.close()
+                    communicationThread = CommunicationThread('user_code.py')
+                    communicationThread.start()
+            except:
+                pass
+        # elif scale.get() < scale_size or scale.get() != prev_scale_setting:
+        elif (scale.get() != prev_scale_setting or 
+                start_scale.get() != prev_start_scale_setting):
+            scroll_position = scrolled_text_pair.scrollbar.get()
+            scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
+            prev_scale_setting = scale.get()
+            start_scale.config(to=prev_scale_setting)
             prev_start_scale_setting = start_scale.get()
+            reset_boxes(new_user_code, executed_code_box, variable_box, output_box)
+            reset_objects()
             display_executed_code(executed_code, from_box, executed_code_box,
                                   variable_box, output_box, start_scale.get(),
-                                  scale_size)
+                                  scale.get())
             display_objects(tree_wrapper, tree_viewer, combobox)
-            # highlight_code(from_box)
             if scroll_position is not None:
                 scrolled_text_pair.right.configure(
                     yscrollcommand=scrolled_text_pair.on_textscroll)
                 scrolled_text_pair.right.yview('moveto', scroll_position[0])
                 scroll_position = None
 
-    # Check for new input
-    lines = str(input_box.get(0.0, END)[:-1]).split('\n')[:-1]
-    check_for_new_input(lines)
+        if communicationThread is not None and not communicationThread.isAlive():
+            input_event.clear()
+            communicationThread = None
+            if successful_exit:
+                successful_exit = False
+                reset_boxes(new_user_code, executed_code_box, variable_box,
+                            output_box)
+                tag_lines(from_box, executed_code_box)
+                scale_size = len(executed_code)
+                scale.config(to=scale_size)
+                scale.set(scale_size)
+                prev_scale_setting = scale_size
+                start_scale.config(to=scale_size)
+                prev_start_scale_setting = start_scale.get()
+                display_executed_code(executed_code, from_box, executed_code_box,
+                                      variable_box, output_box, start_scale.get(),
+                                      scale_size)
+                display_objects(tree_wrapper, tree_viewer, combobox)
+                # highlight_code(from_box)
+                if scroll_position is not None:
+                    scrolled_text_pair.right.configure(
+                        yscrollcommand=scrolled_text_pair.on_textscroll)
+                    scrolled_text_pair.right.yview('moveto', scroll_position[0])
+                    scroll_position = None
 
-    if input_box_has_changes(lines):
-        # If a thread is running, kill the thread and set the rerun flag.
-        # Else rerun the user's code right away.
-        if communicationThread is not None and communicationThread.isAlive():
-            communicationThread.stop()
-            rerun_event.set()
-        else:
+        # Check for new input
+        lines = str(input_box.get(0.0, END)[:-1]).split('\n')[:-1]
+        check_for_new_input(lines)
+
+        if input_box_has_changes(lines):
+            # If a thread is running, kill the thread and set the rerun flag.
+            # Else rerun the user's code right away.
+            if communicationThread is not None and communicationThread.isAlive():
+                communicationThread.stop()
+                rerun_event.set()
+            else:
+                user_code = ''
+            input_event.clear()
+
+        # Wait for the thread to kill itself, then rerun the user's code.
+        if communicationThread is None and rerun_event.isSet():
+            rerun_event.clear()
             user_code = ''
-        input_event.clear()
-
-    # Wait for the thread to kill itself, then rerun the user's code.
-    if communicationThread is None and rerun_event.isSet():
-        rerun_event.clear()
-        user_code = ''
 
     root.after(500, debug_loop, from_box, executed_code_box, input_box,
                variable_box, output_box, start_scale, scale,

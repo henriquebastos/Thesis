@@ -150,6 +150,8 @@ class Communicator(object):
                     self.evaluate_return(data, lineno)
             else:
                 result = self.evaluate_expressions(data, lineno)
+                if '\n' in result:
+                    result = result.split('\n')[-1]
                 self.executed_code[self.call]['result'] = result
                 self.call += 1
 
@@ -337,6 +339,7 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
     debugger_read, debugger_write = os.pipe()
     pid = os.fork()
     if pid:  # Parent
+        print pid
         os.close(communicator_read)
         os.close(debugger_write)
 
@@ -344,12 +347,14 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
         debugger_read_2, debugger_write_2 = os.pipe()
         pid2 = os.fork()
         if pid2:
+            print pid2
             os.close(communicator_read_2)
             os.close(debugger_write_2)
 
             communicator = Communicator()
             communicator.communicate(communicator_write, debugger_read, communicator_write_2, debugger_read_2, file,
                                      stop_event, input_event, user_inputs, pid, pid2)
+            print 'COMMUNICATE RETURNED'
         else:
             os.close(debugger_read)
             os.close(communicator_write)
@@ -358,6 +363,7 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
             launch_child(debugger_write_2, communicator_read_2, file)
         os.close(communicator_write_2)
         os.close(debugger_read_2)
+        print pid2
         os.kill(pid2, signal.SIGKILL)
     else:  # Child
         os.close(debugger_read)
@@ -365,8 +371,8 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
         launch_child(debugger_write, communicator_read, file)
     os.close(communicator_write)
     os.close(debugger_read)
+    print pid
     os.kill(pid, signal.SIGKILL)
-
     # TODO remove this and make it part of os.read()
     # May already be done.
     for key, value in communicator.executed_code.iteritems():

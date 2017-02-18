@@ -761,30 +761,8 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 
     def _getval(self, arg):
         try:
-            # if has_no_keywords(arg):
             return eval(arg, self.curframe.f_globals,
                         self.curframe_locals)
-            # else:
-            #     return None
-            # fd_read, fd_write = os.pipe()
-            # pid = os.fork()
-            # if pid:  # Parent
-            #     # os.close(self.fd_write)
-            #     r = os.read(self.fd_read, 1000)
-            #     # os.close(fd_read)
-            #     os.kill(pid, signal.SIGKILL)
-            #     # return r.split('\nNone\n(Pdb) ')[0]
-            #     return r
-            # else:  # Child
-            #     # os.close(fd_read)
-            #     os.close(sys.stdin.fileno())
-            #     os.close(sys.stdout.fileno())
-            #     os.dup2(self.fd_write, sys.stdout.fileno())
-            #     print eval(arg, self.curframe.f_globals,
-            #                self.curframe_locals)
-            #     # os.close(fd_write)
-            #     exit(0)
-                # os.exit(1) # see if exit without execption
         except SystemExit:
             pass
         except:
