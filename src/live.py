@@ -16,7 +16,7 @@ from treeview_wrappers import TreeWrapper, TreeViewer
 
 # RENAME to Environment
 
-name = 'Noah\'s Live Programming Environment'
+name = 'Live Programming Environment'
 root = Tk(screenName=name, baseName=name, className=name)
 user_code = ''
 user_inputs = []
@@ -51,8 +51,8 @@ display_map = {}
 
 def get_function_call_lineno(call, lineno):
     for line, values in additional_lines_call_point.iteritems():
-        for additional_line, additional_call in values.iteritems():
-            if lineno == additional_line and call == additional_call:
+        for additional_line, additional_calls in values.iteritems():
+            if lineno == additional_line and call in additional_calls:
                 return line
 
 
@@ -68,6 +68,14 @@ def variable_declared_in_scope(variable, function, function_lines):
     return False
 
 
+def get_function_call_points(lineno):
+    call_points = {}
+    for line, func_calls in additional_lines_call_point.iteritems():
+        if lineno in func_calls:
+            call_points[line] = additional_lines_call_point[line][lineno]
+    return call_points
+
+
 
 def display_variables(variable_box, call_num):
     global variable_scope
@@ -79,7 +87,7 @@ def display_variables(variable_box, call_num):
     # print 'Variable Scope:'
     # for k,v in variable_scope.items():
     #     print '\t{0}: {1}'.format(k,v)
-    # print 'Executed Code: '
+    # print 'Executed Code:'
     # for k,v in executed_code.items():
     #     print '\t{0}: {1}'.format(k,v)
     # print 'DATA: '
@@ -90,6 +98,9 @@ def display_variables(variable_box, call_num):
     #     print '\t{0}: {1}'.format(k,v)
     # print 'Variable Values Per Line:'
     # for k,v in variable_values_per_line.items():
+    #     print '\t{0}: {1}'.format(k,v)
+    # print 'Additional Lines Call Point:'
+    # for k,v in additional_lines_call_point.items():
     #     print '\t{0}: {1}'.format(k,v)
 
     variable_box.delete(0.0, END)
@@ -256,8 +267,10 @@ def check_function_variables_arguments(lineno, values):
 def handle_assignment_in_executed_code(value, call_num):
     scope = get_scope(value['lineno'])
     variable = value['result'].split('=')[0]
-    result = value['result'].split('=')[1]
-    # set_variable_value(scope, variable, result)
+    if '=' in value['result']:
+        result = value['result'].split('=')[1]
+    else:
+        result = ''
     if not check_for_new_object(scope, variable, result):
         check_add_to_object(scope, variable, value['result'],
                             value['lineno'])
@@ -302,10 +315,8 @@ def get_display_line_in_executed_code(value):
             class_name = result.split(' instance')[0].split('.')[1]
             instance_id = result.split(' instance at ')[1].split('>')[0]
             obj = get_object(instance_id)
-            # return '{0}={1}_{2}'.format(variable, class_name, obj.simple_id)
             return '{1}_{2}'.format(variable, class_name, obj.simple_id)
         except:
-            # return '{0}'.format(value['result'])
             if '=' in value['result']:
                 value['result'] = value['result'].split('=')[1]
             return '{0}'.format(value['result'])
@@ -362,58 +373,7 @@ def handle_highlights_in_executed_code(key, value, display_map, display_line,
     return tab_count
 
 
-def highlight_executed_code(executed_code_box, value):
-    lineno = value['lineno']
-    start = value['start']
-    end = value['end']
-    data = executed_code_box.get('{0}.{1}'.format(lineno, start),
-                                 '{0}.{1}'.format(lineno, end))
-    offset = 0
-    for token, content in lex(data, PythonLexer()):
-        if content == 'None':
-            executed_code_box.tag_add('Token.Literal.Number.Integer', 
-                                  '{0}.{1}'.format(lineno, start + offset), 
-                                  '{0}.{1}'.format(lineno, start + offset + len(content)))
-        elif str(token) == 'Token.Operator' and content == '.':
-            pass
-        else:
-            executed_code_box.tag_add(str(token), 
-                                  '{0}.{1}'.format(lineno, start + offset), 
-                                  '{0}.{1}'.format(lineno, start + offset + len(content)))
-        offset += len(content)
-
-
-def add_tags_to_executed_code(executed_code_box, code_box):
-    for key, value in highlight_map.iteritems():
-        calling_lines = []
-        calling_line = get_function_call_lineno(key, value['lineno'])
-        if calling_line is not None:
-            calling_lines.append(calling_line)
-        highlight_executed_code(executed_code_box, value)
-        # executed_code_box.tag_add('call{0}'.format(key),
-        #                           '{0}.{1}'.format(value['lineno'],
-        #                                            value['start']),
-        #                           '{0}.{1}'.format(value['lineno'],
-        #                                            value['end']))
-        # executed_code_box.tag_bind(
-        #     'call{0}'.format(key),
-        #     '<Enter>',
-        #     lambda event, widget=executed_code_box, lineno=value['lineno'],
-        #     line_start=value['start'], line_length=value['end'],
-        #     opt_widget=code_box, lines=calling_lines:
-        #         add_highlight(event, widget, lineno, line_start,
-        #                       line_length, opt_widget, lines))
-        # executed_code_box.tag_bind(
-        #     'call{0}'.format(key),
-        #     '<Leave>',
-        #     lambda event, widget=executed_code_box, lineno=value['lineno'],
-        #     line_start=value['start'], line_length=value['end'],
-        #     opt_widget=code_box, lines=calling_lines:
-        #         remove_highlight(event, widget, lineno, line_start,
-        #                          line_length, opt_widget, lines))
-
-
-def display_executed_code(executed_code, code_box, executed_code_box,
+def display_executed_code(executed_code, code_box,
                           variable_box, output_box, start, total):
     global highlight_map
     global current_generic_object
@@ -443,11 +403,6 @@ def display_executed_code(executed_code, code_box, executed_code_box,
                                                        display_line, tab_count)
         total -= 1
         start -= 1
-        # tab_count = handle_highlights_in_executed_code(key, value, display_map,
-        #                                                display_line, tab_count)
-    # for key, value in display_map.iteritems():
-    #     executed_code_box.insert(float(key), value)
-    add_tags_to_executed_code(executed_code_box, code_box)
 
 
 def get_classes():
@@ -487,32 +442,14 @@ def display_objects(tree_wrapper, tree_viewer, combobox):
         if name is not None:
             root_objects.append(tree)
             root_objects_names.append(name)
-    # for instance_id in generic_objects.keys():
-    #     appears_as_child = False
-    #     this_tree = None
-    #     for tree in trees:
-    #         if len(tree.generic_object.name) == 0:
-    #             this_tree = tree
-    #         elif instance_id != tree.generic_object.instance_id:
-    #             for value in tree.generic_object.object_variables.values():
-    #                 if instance_id in value:
-    #                     appears_as_child = True
-    #         else:
-    #             this_tree = tree
-    #     if not appears_as_child:
-    #         root_objects_names.append(this_tree.generic_object.get_name())
-    #         root_objects.append(this_tree)
     combobox['values'] = tuple(root_objects_names)
 
 
-def reset_boxes(new_user_code, executed_code_box, variable_box, output_box):
+def reset_boxes(new_user_code, variable_box, output_box):
     global variable_values
-    executed_code_box.delete(0.0, END)
     variable_box.delete(0.0, END)
     output_box.delete(0.0, END)
     variable_values = {}
-    for i in range(len(new_user_code.split('\n'))):
-        executed_code_box.insert(float(i), '\n')
 
 
 def reset_objects():
@@ -539,21 +476,26 @@ def highlight_code(code_box):
         code_box.mark_set('range_end', 'range_start + %dc' % len(content))
         if content == 'None':
             # purple
+            code_box.tag_remove('Token.Literal.Number.Integer', 'range_start', 'range_end')
             code_box.tag_add('Token.Literal.Number.Integer', 'range_start', 'range_end')
         elif ((content == '__init__' and str(token) == 'Token.Name.Function') or
                 (content in get_classes() and str(token) == 'Token.Name') or
                 ((content == 'class' or content == 'def') and str(token) == 'Token.Keyword')):
             # blue
+            code_box.tag_remove('Token.Name.Builtin', 'range_start', 'range_end')
             code_box.tag_add('Token.Name.Builtin', 'range_start', 'range_end')
         elif is_def and str(token) == 'Token.Name':
             # orange
+            code_box.tag_remove('Token.Name.Builtin.Pseudo', 'range_start', 'range_end')
             code_box.tag_add('Token.Name.Builtin.Pseudo', 'range_start', 'range_end')
         elif str(token) == 'Token.Name' and (content in get_classes() or
                 content in get_functions()):
+            code_box.tag_remove('Token.Name.Builtin', 'range_start', 'range_end')
             code_box.tag_add('Token.Name.Builtin', 'range_start', 'range_end')
         elif str(token) == 'Token.Operator' and content == '.':
             pass
         else:
+            code_box.tag_remove(str(token), 'range_start', 'range_end')
             code_box.tag_add(str(token), 'range_start', 'range_end')
         code_box.mark_set('range_start', 'range_end')
 
@@ -561,6 +503,8 @@ def highlight_code(code_box):
 def tag_add_highlight(widget, line, start, length):
     global DO_NOT_RUN
     DO_NOT_RUN = True
+    widget.tag_remove('HIGHLIGHT', '{0}.{1}'.format(line, start),
+                      '{0}.{1}'.format(line, length))
     widget.tag_add('HIGHLIGHT', '{0}.{1}'.format(line, start),
                    '{0}.{1}'.format(line, length))
     if line in display_map:
@@ -613,12 +557,92 @@ def tag_add_code(event, widget, line):
         widget.insert('{0}.end'.format(line), '     {0}'.format(display_map[line]))
 
 
-def tag_lines(code_box, executed_code_box):
+def display_func_output(event, code_box, executed_box, func_lineno, selected_call):
+    code_box.delete(0.0, END)
+    executed_box.delete(0.0, END)
+    selected_line = selected_call.get()
+    if 'Call: ' in selected_line:
+        selected_line = selected_line.lstrip('Call: ')
+        index = int(selected_line.split(' @ ')[0]) - 1
+        calling_lineno = selected_line.split(' @ ')[1].lstrip('Line: ')
+
+    else:
+        index = 0
+        calling_lineno = selected_line.lstrip('Line: ')
+    if ',' in calling_lineno:
+        calling_lineno = calling_lineno.split(',')[0]
+    calling_lineno = int(calling_lineno)
+    # Get function Lines:
+    func_lines = []
+    if 'function_lines' in data:
+        for func, lines in data['function_lines'].iteritems():
+            if func_lineno in lines:
+                func_lines = lines
+                continue
+    # Get the code for those lines
+    code_output = ''
+    executed_output = ''
+    for line in func_lines:
+        code_line = str(user_code.split('\n')[line-1])
+        # Get executed_code
+        call_no = additional_lines_call_point[calling_lineno][line][index]
+        executed_line = None
+        if 'result' in executed_code[call_no]:
+            executed_line = executed_code[call_no]['result']
+        else:
+            for variable, value in executed_code[call_no]['values'].iteritems():
+                if executed_line is None:
+                    executed_line = '{0}={1}'.format(variable, value)
+                else:
+                    executed_line += ',{0}={1}'.format(variable, value)
+        code_output += '{0}\n'.format(code_line)
+        executed_output += '{0}\n'.format(executed_line)
+    code_box.insert(INSERT, code_output)
+    executed_box.insert(INSERT, executed_output)
+
+def tag_function_calls(event, line, call_points):
+    toplevel = Toplevel()
+    selected_call = StringVar()
+    code_box = Text(toplevel, height=10, width=50)
+    executed_box = Text(toplevel, height=10, width=50)
+    combobox = ttk.Combobox(toplevel, textvariable=selected_call)
+    combobox['state'] = 'readonly'
+    result = []
+
+    index = 1
+    for lineno, calls in call_points.iteritems():
+        for call in calls:
+            if len(calls) > 1:
+                call_line = 'Call: {0} @ Line: {1}'.format(index, lineno)
+            else:
+                call_line = 'Line: {1}'.format(index, lineno)
+            for variable, value in executed_code[call]['values'].iteritems():
+                if ':' in call_line:
+                    call_line += ', {0}={1}'.format(variable, value)
+                else:
+                    call_line += ': {0}={1}'.format(variable, value)
+            result.append(call_line)
+            index += 1
+    result.sort()
+    combobox['values'] = tuple(result)
+    combobox.unbind('<<ComboboxSelected>>')
+    combobox.bind('<<ComboboxSelected>>', lambda event, cb=code_box,
+                        eb=executed_box, f_lno=line, sc=selected_call:
+                        display_func_output(event, cb, eb, f_lno, sc))
+    combobox.pack()
+    code_box.pack(side=LEFT)
+    executed_box.pack(side=LEFT)
+
+
+def tag_lines(code_box):
     global data
     user_code = code_box.get('0.0', 'end-1c')
     lines = str(user_code).split('\n')
     line_count = 1
     for line in lines:
+        code_box.tag_remove('line{0}'.format(line_count),
+                            '{0}.0'.format(line_count),
+                            '{0}.{1}'.format(line_count, len(line)))
         code_box.tag_add('line{0}'.format(line_count),
                          '{0}.0'.format(line_count),
                          '{0}.{1}'.format(line_count, len(line)))
@@ -634,25 +658,31 @@ def tag_lines(code_box, executed_code_box):
                 elif ('classes' in data and name in data['classes'] and
                         '__init__' in data['classes'][name]['functions']):
                     additional_lines.extend(data['classes'][name]['functions']['__init__'])
+        code_box.tag_unbind('line{0}'.format(line_count), '<Enter>')
+        code_box.tag_unbind('line{0}'.format(line_count), '<Leave>')
         code_box.tag_bind(
             'line{0}'.format(line_count),
             '<Enter>',
             lambda event, widget=code_box, lineno=line_count,
-            line_length=len(line), opt_widget=executed_code_box,
+            line_length=len(line), opt_widget=None,
             lines=additional_lines: add_highlight(
                 event, widget, lineno, 0, line_length, widget, lines))
         code_box.tag_bind(
             'line{0}'.format(line_count),
             '<Leave>',
             lambda event, widget=code_box, lineno=line_count,
-            line_length=len(line), opt_widget=executed_code_box,
+            line_length=len(line), opt_widget=None,
             lines=additional_lines: remove_highlight(
                 event, widget, lineno, 0, line_length, widget, lines))
-        code_box.tag_bind(
-            'line{0}'.format(line_count),
-            '<Button-1>',
-            lambda event, widget=executed_code_box, lineno=line_count:
-            tag_add_code(event, widget, lineno))
+        if (line_count in data and 'type' in data[line_count] and
+                'func' == data[line_count]['type']):
+            call_points = get_function_call_points(line_count)
+            code_box.tag_unbind('line{0}'.format(line_count), '<Button-1>')
+            code_box.tag_bind(
+                'line{0}'.format(line_count),
+                '<Button-1>',
+                lambda event, lineno=line_count, cp=call_points:
+                tag_function_calls(event, lineno, cp))
 
         line_count += 1
 
@@ -749,8 +779,8 @@ def input_box_has_changes(lines):
     return has_changed
 
 
-def debug_loop(from_box, executed_code_box, input_box, variable_box,
-               output_box, start_scale, scale, scrolled_text_pair,
+def debug_loop(from_box, input_box, variable_box,
+               output_box, start_scale, scale,
                tree_wrapper, tree_viewer, combobox):
     global user_code
     global scale_size
@@ -769,13 +799,7 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
         new_user_code = from_box.get(0.0, END)[:-1]
 
         if user_code != new_user_code:
-            scroll_position = scrolled_text_pair.scrollbar.get()
-            scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
             highlight_code(from_box)
-            # tag_lines(from_box, executed_code_box)
-            # user_code = new_user_code
-            # with open(FILE_NAME, "w") as code_file:
-            #     code_file.write(user_code)
             try:
                 if communicationThread is None:
                     user_code = new_user_code
@@ -786,17 +810,14 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
                     communicationThread.start()
             except:
                 pass
-        # elif scale.get() < scale_size or scale.get() != prev_scale_setting:
         elif (scale.get() != prev_scale_setting or 
                 start_scale.get() != prev_start_scale_setting):
-            scroll_position = scrolled_text_pair.scrollbar.get()
-            scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
             prev_scale_setting = scale.get()
             start_scale.config(to=prev_scale_setting)
             prev_start_scale_setting = start_scale.get()
-            reset_boxes(new_user_code, executed_code_box, variable_box, output_box)
+            reset_boxes(new_user_code, variable_box, output_box)
             reset_objects()
-            display_executed_code(executed_code, from_box, executed_code_box,
+            display_executed_code(executed_code, from_box,
                                   variable_box, output_box, start_scale.get(),
                                   scale.get())
             display_objects(tree_wrapper, tree_viewer, combobox)
@@ -811,20 +832,19 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
             communicationThread = None
             if successful_exit:
                 successful_exit = False
-                reset_boxes(new_user_code, executed_code_box, variable_box,
+                reset_boxes(new_user_code, variable_box,
                             output_box)
-                tag_lines(from_box, executed_code_box)
+                tag_lines(from_box)
                 scale_size = len(executed_code)
                 scale.config(to=scale_size)
                 scale.set(scale_size)
                 prev_scale_setting = scale_size
                 start_scale.config(to=scale_size)
                 prev_start_scale_setting = start_scale.get()
-                display_executed_code(executed_code, from_box, executed_code_box,
+                display_executed_code(executed_code, from_box,
                                       variable_box, output_box, start_scale.get(),
                                       scale_size)
                 display_objects(tree_wrapper, tree_viewer, combobox)
-                # highlight_code(from_box)
                 if scroll_position is not None:
                     scrolled_text_pair.right.configure(
                         yscrollcommand=scrolled_text_pair.on_textscroll)
@@ -850,74 +870,9 @@ def debug_loop(from_box, executed_code_box, input_box, variable_box,
             rerun_event.clear()
             user_code = ''
 
-    root.after(500, debug_loop, from_box, executed_code_box, input_box,
+    root.after(500, debug_loop, from_box, input_box,
                variable_box, output_box, start_scale, scale,
-               scrolled_text_pair, tree_wrapper, tree_viewer, combobox)
-
-
-class ScrolledTextPair(Frame):
-    # http://stackoverflow.com/questions/32038701/python-tkinter-making-two-text-widgets-scrolling-synchronize
-    '''Two Text widgets and a Scrollbar in a Frame'''
-
-    def __init__(self, master, **kwargs):
-        Frame.__init__(self, master)  # no need for super
-        # Different default width
-        # if 'width' not in kwargs:
-        #     kwargs['width'] = 30
-        # Creating the widgets
-        self.left = Text(self, foreground='white', background='gray15')
-        self.left.tag_configure('Token.Keyword', foreground='orange red')
-        self.left.tag_configure('Token.Operator', foreground='orange red')
-        self.left.tag_configure('Token.Name.Class', foreground='green yellow')
-        self.left.tag_configure('Token.Name.Function', foreground='green yellow')
-        self.left.tag_configure('Token.Literal.Number.Integer',
-                                foreground='medium orchid')
-        self.left.tag_configure('Token.Name.Builtin', foreground='medium turquoise')
-        self.left.tag_configure('Token.Literal.String.Single',
-                                foreground='yellow')
-        self.left.tag_configure('Token.Name.Builtin.Pseudo',
-                                foreground='orange')
-        self.left.tag_configure('HIGHLIGHT', background='gray5')
-        if os.path.isfile(FILE_NAME):
-            with open(FILE_NAME, 'r') as code_file:
-                lines = code_file.readlines()
-                for line in lines:
-                    self.left.insert(INSERT, line)
-                code_file.close()
-        self.left.pack({'side': 'left'})
-
-        self.right = Text(self, foreground='white', background='gray15',
-                          wrap=NONE)
-        self.right.tag_configure('Token.Keyword', foreground='orange red')
-        self.right.tag_configure('Token.Operator', foreground='orange red')
-        self.right.tag_configure('Token.Name.Function', foreground='lawn green')
-        self.right.tag_configure('Token.Literal.Number.Integer',
-                                foreground='medium orchid')
-        self.right.tag_configure('Token.Name.Builtin', foreground='medium turquoise')
-        self.right.tag_configure('Token.Literal.String.Single',
-                                foreground='yellow')
-        self.right.tag_configure('Token.Name.Builtin.Pseudo',
-                                foreground='orange')
-        self.right.tag_configure('HIGHLIGHT', background='gray5')
-        self.right.pack({'side': 'left'})
-
-        self.scrollbar = Scrollbar(self)
-        self.scrollbar.pack(side=RIGHT, fill=Y)
-        # Changing the settings to make the scrolling work
-        self.scrollbar['command'] = self.on_scrollbar
-        self.left['yscrollcommand'] = self.on_textscroll
-        self.right['yscrollcommand'] = self.on_textscroll
-
-    def on_scrollbar(self, *args):
-        '''Scrolls both text widgets when the scrollbar is moved'''
-        self.left.yview(*args)
-        self.right.yview(*args)
-
-    def on_textscroll(self, *args):
-        '''Moves the scrollbar and scrolls text widgets when the mousewheel
-        is moved on a text widget'''
-        self.scrollbar.set(*args)
-        self.on_scrollbar('moveto', args[0])
+               tree_wrapper, tree_viewer, combobox)
 
 
 class Application(Frame):
@@ -929,7 +884,6 @@ class Application(Frame):
             user_inputs.append('quit')
             input_event.set()
             while communicationThread.isAlive():
-                # print 'HERE'
                 continue
             communicationThread = None
         self.quit()
@@ -946,72 +900,70 @@ class Application(Frame):
     def createWidgets(self):
         self.bg = 'grey'
         main_frame = Frame(self, bg='grey')
-        middle_frame = Frame(main_frame, bg='grey')
-        menu_frame = Frame(middle_frame)
-        code_frame = Frame(middle_frame)
-        executed_code_frame = Frame(middle_frame)
-        input_frame = Frame(middle_frame)
+        menu_frame = Frame(main_frame)
+        left_frame = Frame(main_frame, bg='grey')
+        center_frame = Frame(main_frame, bg='grey')
+        right_frame = Frame(main_frame, bg='grey')
 
-        bottom_frame = Frame(main_frame, bg='grey')
-        variable_frame = Frame(bottom_frame)
-        output_frame = Frame(bottom_frame, width=50)
-        tree_frame = Frame(bottom_frame)
+        code_frame = Frame(left_frame)
+        variable_frame = Frame(center_frame)
+        tree_frame = Frame(center_frame)
+        input_frame = Frame(right_frame, width=50)
+        output_frame = Frame(right_frame, width=50)
 
         main_frame.pack()
-        middle_frame.pack(side=TOP)
         menu_frame.pack(side=TOP, fill=X)
-        code_frame.pack(side=LEFT)
-        executed_code_frame.pack(side=LEFT)
-        input_frame.pack(side=LEFT)
-        bottom_frame.pack(side=BOTTOM)
-        variable_frame.pack(side=LEFT)
-        tree_frame.pack(side=LEFT)
-        output_frame.pack(side=LEFT)
+        left_frame.pack(side=LEFT, fill=Y)
+        center_frame.pack(side=LEFT)
+        right_frame.pack(side=LEFT)
 
+        code_frame.pack(fill=Y)
+        variable_frame.pack(side=TOP)
+        tree_frame.pack(side=TOP)
+        input_frame.pack(side=TOP)
+        output_frame.pack(side=TOP)
+
+        # Menu Frame
         QUIT = Button(master=menu_frame, text='Quit', command=self.close_all)
         QUIT.pack(side=LEFT)
-
         start_execution_step = Scale(menu_frame, orient=HORIZONTAL)
         start_execution_step.pack(side=LEFT, padx=200)
-        
         input_button = Button(master=menu_frame, text='Input File',
                               command=lambda: self.open_input_file(input_box))
         input_button.pack(side=RIGHT)
-        
         execution_step = Scale(menu_frame, orient=HORIZONTAL)
         execution_step.pack(side=RIGHT, padx=200)
 
-        code_title = Label(code_frame, text='Source Code\t\t\t\t\t\tExecuted Code')
+        # Left Frame
+        code_title = Label(code_frame, text='Source Code')
         code_title.pack(side=TOP, fill=X)
-        paired_text_boxes = ScrolledTextPair(code_frame, foreground='white',
-                                             background='gray15')
-        code_box = paired_text_boxes.left
-        executed_code_box = paired_text_boxes.right
-        paired_text_boxes.pack()
-
-        input_title = Label(input_frame, text='Input')
-        input_title.pack(side=TOP, fill=X)
-        input_box = Text(input_frame)
-        input_box.pack({'side': 'left'})
-
-        if os.path.isfile(INPUT_FILE_NAME):
-            with open(INPUT_FILE_NAME, 'r') as input_file:
-                lines = input_file.readlines()
+        code_box = Text(code_frame, foreground='white', background='gray15', height=55)
+        code_box.tag_configure('Token.Keyword', foreground='orange red')
+        code_box.tag_configure('Token.Operator', foreground='orange red')
+        code_box.tag_configure('Token.Name.Class', foreground='green yellow')
+        code_box.tag_configure('Token.Name.Function', foreground='green yellow')
+        code_box.tag_configure('Token.Literal.Number.Integer',
+                                foreground='medium orchid')
+        code_box.tag_configure('Token.Name.Builtin', foreground='medium turquoise')
+        code_box.tag_configure('Token.Literal.String.Single',
+                                foreground='yellow')
+        code_box.tag_configure('Token.Name.Builtin.Pseudo',
+                                foreground='orange')
+        code_box.tag_configure('HIGHLIGHT', background='gray5')
+        if os.path.isfile(FILE_NAME):
+            with open(FILE_NAME, 'r') as code_file:
+                lines = code_file.readlines()
                 for line in lines:
-                    input_box.insert(INSERT, line)
-                    user_inputs.append(line[:-1])
-                input_file.close()
+                    code_box.insert(INSERT, line)
+                code_file.close()
+        code_box.pack(side=TOP, fill=Y)
 
+        # Center Frame
         variable_title = Label(variable_frame, text='Variables')
         variable_title.pack(side=TOP, fill=X)
         variable_box = Text(variable_frame)
         variable_box.tag_configure("BOLD", font=('-weight bold'))
-        variable_box.pack({'side': 'left'})
-
-        output_title = Label(output_frame, text='Output')
-        output_title.pack(side=TOP, fill=X)
-        output_box = Text(output_frame)
-        output_box.pack({'side': 'left'})
+        variable_box.pack(side=TOP)
 
         tree_frame_title = Label(tree_frame, text='Objects')
         tree_frame_title.pack(side=TOP, fill=X)
@@ -1023,9 +975,27 @@ class Application(Frame):
         combobox.bind('<<ComboboxSelected>>', lambda event, cb=combobox,
                         tv=tree_viewer: display_tree(event, cb, tv))
 
-        root.after(500, debug_loop, code_box, executed_code_box, input_box,
+        # Right Frame
+        input_title = Label(input_frame, text='Input')
+        input_title.pack(side=TOP, fill=X)
+        input_box = Text(input_frame)
+        input_box.pack(side=TOP, fill=Y)
+        if os.path.isfile(INPUT_FILE_NAME):
+            with open(INPUT_FILE_NAME, 'r') as input_file:
+                lines = input_file.readlines()
+                for line in lines:
+                    input_box.insert(INSERT, line)
+                    user_inputs.append(line[:-1])
+                input_file.close()
+
+        output_title = Label(output_frame, text='Output')
+        output_title.pack(side=TOP, fill=X)
+        output_box = Text(output_frame)
+        output_box.pack(side=TOP, fill=Y)
+
+        root.after(500, debug_loop, code_box, input_box,
                    variable_box, output_box, start_execution_step,
-                   execution_step, paired_text_boxes, tree_wrapper,
+                   execution_step, tree_wrapper,
                    tree_viewer, combobox)
 
     def __init__(self, master=None):

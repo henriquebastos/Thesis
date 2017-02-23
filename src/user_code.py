@@ -1,17 +1,20 @@
 def f(a, b):
-   a = 3
    z = a + b
    return z
-
+     
 def g():
    return 1
 
 a = 1
 b = 2
-a = f(a, b) + g()
+i = 0
+
+while i < 3:     
+   a = f(a, b) + g()
+   i += 1
+
 print a
 print 2
-
 
 a12 = 1
 a3 = []

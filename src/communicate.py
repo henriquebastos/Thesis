@@ -261,7 +261,8 @@ class Communicator(object):
             final_expression = self.evaluate(data[lineno]['expressions'],
                                              False)
         if 'additional_lines' in data[lineno]:
-            self.additional_lines_call_point[lineno] = {}
+            if lineno not in self.additional_lines_call_point:
+                self.additional_lines_call_point[lineno] = {}
             for name in data[lineno]['additional_lines']:
                 if '.' in name:
                     name = name.split('.')[-1]
@@ -324,7 +325,9 @@ class Communicator(object):
     def add_call_point(self, lineno):
         for t in self.looking_for:
             if lineno in t[1]:
-                self.additional_lines_call_point[t[0]][lineno] = self.call
+                if lineno not in self.additional_lines_call_point[t[0]]: 
+                    self.additional_lines_call_point[t[0]][lineno] = []
+                self.additional_lines_call_point[t[0]][lineno].append(self.call)
                 t[1].remove(lineno)
 
 
