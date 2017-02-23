@@ -217,6 +217,7 @@ class WalkAST(ast.NodeVisitor):
     # For(expr target, expr iter, stmt* body, stmt* orelse)
     def visit_For(self, node):
         print '{0}: For'.format(node.lineno)
+        utils.add_loop_def(self.data, node.lineno)
         target_walker = walk_ast_for_names(node.target, self.current_scope)
         utils.add_string_to_data(node.lineno, target_walker.data,
                                  target_walker.line)
@@ -231,6 +232,7 @@ class WalkAST(ast.NodeVisitor):
                                       expr_walker.variable_scope)
         for stmts in [node.body, node.orelse]:
             for stmt in stmts:
+                utils.add_loop_line(self.data, node.lineno, stmt.lineno)
                 walker = walk_ast(stmt, self.current_scope)
                 utils.add_string_to_data(stmt.lineno, walker.data,
                                          walker.line)
@@ -243,6 +245,7 @@ class WalkAST(ast.NodeVisitor):
     # While(expr test, stmt* body, stmt* orelse)
     def visit_While(self, node):
         print '{0}: While'.format(node.lineno)
+        utils.add_loop_def(self.data, node.lineno)
         test_walker = WalkAST(self.current_scope)
         test_walker.get_names = True
         test_walker.visit(node.test)
@@ -253,6 +256,7 @@ class WalkAST(ast.NodeVisitor):
                                       test_walker.variable_scope)
         for stmts in [node.body, node.orelse]:
             for stmt in stmts:
+                utils.add_loop_line(self.data, node.lineno, stmt.lineno)
                 walker = walk_ast(stmt, self.current_scope)
                 utils.add_string_to_data(stmt.lineno, walker.data,
                                          walker.line)
@@ -835,6 +839,9 @@ if __name__ == '__main__':
     walker = WalkAST()
     walker.visit(tree)
     walker.print_map()
+    print '\nDATA:'
+    for key, value in walker.data.items():
+        print '\t{0}: {1}'.format(key, value)
     print '\nVARIABLE SCOPE:'
     for key, value in walker.variable_scope.items():
         print '\t{0}: {1}'.format(key, value)

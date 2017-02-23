@@ -76,6 +76,16 @@ def get_function_call_points(lineno):
     return call_points
 
 
+def get_loop_iteration_calls(lineno, lines):
+    calls = []
+    count = 0
+    for call, info in executed_code.iteritems():
+        if info['lineno'] in lines:
+            calls.append(call)
+        if info['lineno'] == lineno:
+            count += 1
+    return calls, count
+
 
 def display_variables(variable_box, call_num):
     global variable_scope
@@ -106,7 +116,7 @@ def display_variables(variable_box, call_num):
     variable_box.delete(0.0, END)
     for func, variables in variable_scope.items():
         func_lines = None
-        if func in data['function_lines']:
+        if 'function_lines' in data and func in data['function_lines']:
             func_lines = data['function_lines'][func]
         variables_line = ''
         for variable in variables:
@@ -583,7 +593,6 @@ def display_func_output(event, code_box, executed_box, func_lineno, selected_cal
     code_output = ''
     executed_output = ''
     for line in func_lines:
-        code_line = str(user_code.split('\n')[line-1])
         # Get executed_code
         call_no = additional_lines_call_point[calling_lineno][line][index]
         executed_line = None
@@ -595,7 +604,7 @@ def display_func_output(event, code_box, executed_box, func_lineno, selected_cal
                     executed_line = '{0}={1}'.format(variable, value)
                 else:
                     executed_line += ',{0}={1}'.format(variable, value)
-        code_output += '{0}\n'.format(code_line)
+        code_output += '{0}\n'.format(str(user_code.split('\n')[line-1]))
         executed_output += '{0}\n'.format(executed_line)
     code_box.insert(INSERT, code_output)
     executed_box.insert(INSERT, executed_output)
@@ -632,6 +641,66 @@ def tag_function_calls(event, line, call_points):
     combobox.pack()
     code_box.pack(side=LEFT)
     executed_box.pack(side=LEFT)
+
+
+def display_loop_output(value, lines, calls, executed_box):
+    executed_box.delete(0.0, END)
+    index = int(value) * len(lines)
+    executed_output = ''
+    i = 0
+    while i < len(lines):
+        executed_line = None
+        if index < len(calls):
+            if 'result' in executed_code[calls[index]]:
+                executed_line = executed_code[calls[index]]['result']
+            else:
+                for variable, value in executed_code[calls[index]]['values'].iteritems():
+                    if executed_line is None:
+                        executed_line = '{0}={1}'.format(variable, value)
+                    else:
+                        executed_line += ',{0}={1}'.format(variable, value)
+            executed_output += '{0}\n'.format(executed_line)
+        index += 1
+        i += 1
+    executed_box.insert(INSERT, executed_output)
+
+
+def tag_loops(event, line):
+    toplevel = Toplevel()
+    lines = data['loop_lines'][line]
+    calls, length = get_loop_iteration_calls(line, lines)
+    code_box = Text(toplevel, height=10, width=50)
+    executed_box = Text(toplevel, height=10, width=50)
+    scale = Scale(toplevel, orient=HORIZONTAL, to=length-1,
+                  command=lambda value, l=lines, c=calls, eb=executed_box:
+                  display_loop_output(value, l, c, eb))
+
+    scale.pack()
+    code_box.pack(side=LEFT)
+    executed_box.pack(side=LEFT)
+
+    code_output = ''
+    for l in lines:
+        code_output += '{0}\n'.format(str(user_code.split('\n')[l-1]))
+    code_box.insert(INSERT, code_output)
+
+    # index = scale.get() * len(lines)
+    # executed_output = ''
+    # i = 0
+    # while i < len(lines):
+    #     executed_line = None
+    #     if 'result' in executed_code[calls[index]]:
+    #         executed_line = executed_code[calls[index]]['result']
+    #     else:
+    #         for variable, value in executed_code[calls[index]]['values'].iteritems():
+    #             if executed_line is None:
+    #                 executed_line = '{0}={1}'.format(variable, value)
+    #             else:
+    #                 executed_line += ',{0}={1}'.format(variable, value)
+    #     executed_output += '{0}\n'.format(executed_line)
+    #     index += 1
+    #     i += 1
+    # executed_box.insert(INSERT, executed_output)
 
 
 def tag_lines(code_box):
@@ -683,7 +752,13 @@ def tag_lines(code_box):
                 '<Button-1>',
                 lambda event, lineno=line_count, cp=call_points:
                 tag_function_calls(event, lineno, cp))
-
+        if (line_count in data and 'type' in data[line_count] and
+                'loop' == data[line_count]['type']):
+            code_box.tag_unbind('line{0}'.format(line_count), '<Button-1>')
+            code_box.tag_bind(
+                'line{0}'.format(line_count),
+                '<Button-1>',
+                lambda event, lineno=line_count: tag_loops(event, lineno))
         line_count += 1
 
 
@@ -817,9 +892,10 @@ def debug_loop(from_box, input_box, variable_box,
             prev_start_scale_setting = start_scale.get()
             reset_boxes(new_user_code, variable_box, output_box)
             reset_objects()
-            display_executed_code(executed_code, from_box,
-                                  variable_box, output_box, start_scale.get(),
-                                  scale.get())
+            if executed_code is not None:
+                display_executed_code(executed_code, from_box,
+                                      variable_box, output_box,
+                                      start_scale.get(), scale.get())
             display_objects(tree_wrapper, tree_viewer, combobox)
             if scroll_position is not None:
                 scrolled_text_pair.right.configure(

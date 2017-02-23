@@ -20,6 +20,11 @@ def setup_function_lines(data):
         data['function_lines'] = {}
 
 
+def setup_loop_lines(data):
+    if 'loop_lines' not in data:
+        data['loop_lines'] = {}
+
+
 def add_string(data, lineno, s):
     setup_expressions(data, lineno)
     if s not in data[lineno]['expressions']:
@@ -46,6 +51,15 @@ def add_function_def(data, name, lineno):
 
 def add_function_line(data, name, lineno):
     data['function_lines'][name].append(lineno)
+
+
+def add_loop_def(data, lineno):
+    setup_loop_lines(data)
+    data['loop_lines'][lineno] = [lineno]
+
+
+def add_loop_line(data, loop_line, lineno):
+    data['loop_lines'][loop_line].append(lineno)
 
 
 def add_additional_lines(data, lineno, func_name):
@@ -110,6 +124,16 @@ def combine_function_lines(lineno, target_data, from_data):
                     target_data['function_lines'][func] = lines
 
 
+def combine_loop_lines(lineno, target_data, from_data):
+    if 'loop_lines' in from_data:
+        if 'loop_lines' not in target_data:
+            target_data['loop_liens'] = from_data['loop_lines']
+        else:
+            for lineno, lines, in from_data['loop_lines'].items():
+                if lineno not in target_data['loop_lines']:
+                    target_data['loop_lines'][lineno] = lines
+
+
 def combine_additional_lines(lineno, target_data, from_data):
     if lineno in from_data and 'additional_lines' in from_data[lineno]:
         target_data[lineno]['additional_lines'] = \
@@ -132,6 +156,7 @@ def combine_data(lineno, target_data, from_data):
     combine_type(lineno, target_data, from_data)
     combine_assigned(lineno, target_data, from_data)
     combine_function_lines(lineno, target_data, from_data)
+    combine_loop_lines(lineno, target_data, from_data)
     combine_additional_lines(lineno, target_data, from_data)
     combine_classes(lineno, target_data, from_data)
 

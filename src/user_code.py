@@ -36,6 +36,9 @@ f_(6)
 print a4
 f_2 = a4.append
 
+for i in [1,2,3,4]:
+   print i
+
 
 class Node():
    def __init__(self):
@@ -121,8 +124,8 @@ b = 3
 print 7
 a = 2
 test()
-user_input = input()
-print user_input
-print user_input + 1
-user_input2 = input()
-print user_input2
+# user_input = input()
+# print user_input
+# print user_input + 1
+# user_input2 = input()
+# print user_input2
