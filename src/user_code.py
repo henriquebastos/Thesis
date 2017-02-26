@@ -1,5 +1,5 @@
-def f(a, b):
-   z = a + b
+def f(a, b, c, d):
+   z = a + b + (c * d)
    return z
 
 # This is a comment
@@ -11,7 +11,7 @@ b = 2
 i = 0
 
 while i < 3:     
-   a = f(a, b) + g()
+   a = f(a, b, 0, 0) + g()
    i += 1
 
 print a
@@ -125,8 +125,8 @@ b = 3
 print 7
 a = 2
 test()
-# user_input = input()
-# print user_input
-# print user_input + 1
-# user_input2 = input()
-# print user_input2
+user_input = input()
+print user_input
+print user_input + 1
+user_input2 = input()
+print user_input2

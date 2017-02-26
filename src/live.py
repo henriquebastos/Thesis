@@ -5,6 +5,7 @@ import tkFileDialog
 import os
 import ScrolledText as ST
 import threading
+import time
 
 from pygments import lex
 from pygments.lexers import PythonLexer
@@ -567,8 +568,7 @@ def tag_add_code(event, widget, line):
         widget.insert('{0}.end'.format(line), '     {0}'.format(display_map[line]))
 
 
-def display_func_output(event, code_box, executed_box, func_lineno, selected_call):
-    code_box.delete(0.0, END)
+def display_func_output(event, executed_box, func_lineno, func_lines, selected_call):
     executed_box.delete(0.0, END)
     selected_line = selected_call.get()
     if 'Call: ' in selected_line:
@@ -582,15 +582,7 @@ def display_func_output(event, code_box, executed_box, func_lineno, selected_cal
     if ',' in calling_lineno:
         calling_lineno = calling_lineno.split(',')[0]
     calling_lineno = int(calling_lineno)
-    # Get function Lines:
-    func_lines = []
-    if 'function_lines' in data:
-        for func, lines in data['function_lines'].iteritems():
-            if func_lineno in lines:
-                func_lines = lines
-                continue
     # Get the code for those lines
-    code_output = ''
     executed_output = ''
     for line in func_lines:
         # Get executed_code
@@ -604,10 +596,122 @@ def display_func_output(event, code_box, executed_box, func_lineno, selected_cal
                     executed_line = '{0}={1}'.format(variable, value)
                 else:
                     executed_line += ',{0}={1}'.format(variable, value)
-        code_output += '{0}\n'.format(str(user_code.split('\n')[line-1]))
         executed_output += '{0}\n'.format(executed_line)
-    code_box.insert(INSERT, code_output)
     executed_box.insert(INSERT, executed_output)
+
+
+def set_var_to_type(v):
+    if v == 'None':
+        return None
+    elif v == 'True':
+        return True
+    elif v == 'False':
+        return False
+    else:
+        try:
+            return int(v)
+        except:
+            return v 
+
+
+class TestFunctionThread(threading.Thread):
+    def __init__(self, filename):
+        self.executed_code = None
+        self.variable_values_per_line = None
+        threading.Thread.__init__(self)
+        self.filename = filename
+        self.stop_event = threading.Event()
+        self.complete = False
+        self.success = False
+
+    def run(self):
+        try:
+            communicator = Communicate.main(self.filename, self.stop_event,
+                                            input_event, user_inputs)
+            if not self.stop_event.isSet():
+                self.executed_code = communicator.executed_code
+                self.variable_values_per_line = communicator.variable_values
+                self.correct_mangled_variables()
+                self.success = True
+        except Exception as e:
+            self.stop()
+            self.success = False
+        self.complete = True
+
+    def correct_mangled_variables(self):
+        for call, evaluated in self.executed_code.iteritems():
+            scope = get_scope(evaluated['lineno'])
+            for key, value in evaluated['values'].iteritems():
+                try:
+                    correct_value = self.variable_values_per_line[call-1][scope][key]
+                    correct_result = self.variable_values_per_line[call][scope][key]
+                    if value != correct_value:
+                        self.executed_code[call]['values'][key] = correct_value
+                        if value == evaluated['result']:
+                            self.executed_code[call]['result'] = correct_result
+                        elif evaluated['result'] == '{0}={1}'.format(key, value):
+                            self.executed_code[call]['result'] = '{0}={1}'.format(key, correct_result)
+                except KeyError:
+                    pass
+
+    def stop(self):
+        self.stop_event.set()
+
+
+def test_function_call(toplevel, executed_box, code, func_lineno, func_name,
+                       func_lines, labels, entries):
+    executed_box.delete(0.0, END)
+    variables = []
+    bad_input = False
+    offset = 0
+    for (l, e) in zip(labels, entries):
+        l_text = l.cget('text').rstrip(':')
+        if e.get() == '':
+            bad_input = True
+            executed_box.insert(INSERT, 'Variable {0}: Invalid Input.\n'.format(l_text))
+        e_text = set_var_to_type(e.get())
+        code += '{0} = {1}\n'.format(l_text, e_text)
+        offset += 1
+    code += '{0}('.format(func_name)
+    for l in labels:
+        code += '{0},'.format(l.cget('text').rstrip(':'))
+    code = code.rstrip(',')
+    code += ')\n'
+    offset += 1
+    if bad_input:
+        executed_box.insert(INSERT, '\nIf you meant to put a string, use quotes\nsuch as: \'INPUT\'\nor\nFor an empty string use: \'\'\n')
+    else:
+        print 'TESTING'
+        print code
+        with open('temp_user_code.py', "w") as code_file:
+            code_file.write(code)
+            code_file.close()
+        functionThread = TestFunctionThread('temp_user_code.py')
+        functionThread.start()
+        while not functionThread.complete and functionThread.isAlive():
+            time.sleep(0.25)
+            pass
+        functionThread.stop()
+        if functionThread.success:
+            executed_output = ''
+            call_no = offset
+            for line in func_lines:
+                # Get executed_code
+                executed_line = None
+                if 'result' in functionThread.executed_code[call_no]:
+                    executed_line = functionThread.executed_code[call_no]['result']
+                else:
+                    for variable, value in functionThread.executed_code[call_no]['values'].iteritems():
+                        if executed_line is None:
+                            executed_line = '{0}={1}'.format(variable, value)
+                        else:
+                            executed_line += ',{0}={1}'.format(variable, value)
+                executed_output += '{0}\n'.format(executed_line)
+                call_no += 1
+            executed_box.insert(INSERT, executed_output)
+        else:
+            executed_box.insert(INSERT, 'There was an error with your code. Please try again or modify your input\n')
+
 
 def tag_function_calls(event, line, call_points):
     toplevel = Toplevel()
@@ -615,6 +719,28 @@ def tag_function_calls(event, line, call_points):
     code_box = Text(toplevel, height=10, width=50)
     executed_box = Text(toplevel, height=10, width=50)
     combobox = ttk.Combobox(toplevel, textvariable=selected_call)
+    labels = []
+    entries = []
+    for expr in data[line]['expressions']:
+        labels.append(Label(toplevel, text='{0}:'.format(expr)))
+        entries.append(Entry(toplevel))
+    func_lines = []
+    func_name = ''
+    if 'function_lines' in data:
+        for func, lines in data['function_lines'].iteritems():
+            if line in lines:
+                func_name = func
+                func_lines = lines
+                continue
+    code_output = ''
+    for l in func_lines:
+        code_output += '{0}\n'.format(str(user_code.split('\n')[l-1]))
+    code_box.insert(INSERT, code_output)
+    
+    test_function_button = Button(toplevel, text='Test Function',
+        command=lambda tl=toplevel, eb=executed_box, c=code_output, f_lno=line,
+        f_name=func_name, f_lines=func_lines, l=labels, e=entries:
+        test_function_call(tl, eb, c, f_lno, f_name, f_lines, l, e))
     combobox['state'] = 'readonly'
     result = []
 
@@ -635,12 +761,22 @@ def tag_function_calls(event, line, call_points):
     result.sort()
     combobox['values'] = tuple(result)
     combobox.unbind('<<ComboboxSelected>>')
-    combobox.bind('<<ComboboxSelected>>', lambda event, cb=code_box,
-                        eb=executed_box, f_lno=line, sc=selected_call:
-                        display_func_output(event, cb, eb, f_lno, sc))
-    combobox.pack()
-    code_box.pack(side=LEFT)
-    executed_box.pack(side=LEFT)
+    combobox.bind('<<ComboboxSelected>>', lambda event,
+                        eb=executed_box, f_lno=line, f_lines=func_lines, sc=selected_call:
+                        display_func_output(event, eb, f_lno, f_lines, sc))
+    combobox.grid(row=0, column=1)
+    test_function_button.grid(row=0, column=2)
+    code_box.grid(row=1, column=0, columnspan=2)
+    executed_box.grid(row=1, column=2, columnspan=2)
+    r = 2
+    c = 0
+    for l, e in zip(labels, entries):
+        l.grid(row=r, column=c, sticky='E')
+        e.grid(row=r, column=c+1, sticky='W')
+        c += 2
+        if c >= 4:
+            r += 1
+            c = 0
 
 
 def display_loop_output(value, lines, calls, executed_box):
