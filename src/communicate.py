@@ -57,6 +57,11 @@ class Communicator(object):
         self.data, self.variable_scope = get_expressions(file)
         lineno = 0
 
+        # ATTEMPT TO FIX VARIABLES WHILE EVALUATING
+            # Step 1 evaluate variables and fix previous line in executed_code
+            # Step 2 is reavaluate variables and set them via p a1 = [1,2] in pdb1
+        # OR
+        # RUN PROGRAM 2 with its own lineno counter and run input requests on its own. (EASY)
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
             output2 = os.read(fd_read_2, 1000)
@@ -78,6 +83,8 @@ class Communicator(object):
         os.kill(pid2, signal.SIGUSR1)
 
     def in_correct_scope(self, scope, lineno):
+        if scope == 'global' and 'function_lines' not in self.data:
+            return True
         if scope == 'global' and 'function_lines' in self.data:
             for func,lines in self.data['function_lines'].iteritems():
                 if lineno in lines:
@@ -100,6 +107,8 @@ class Communicator(object):
                         if scope not in self.variable_values[self.call-1]:
                             self.variable_values[self.call-1][scope] = {}
                         self.variable_values[self.call-1][scope][variable] = result
+                        os.write(self.fd_write, '!{0}={1}\n'.format(variable, result))
+                        os.read(self.fd_read, 1000)
 
     def parse_line(self, line):
         lineno = -1

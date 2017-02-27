@@ -364,22 +364,25 @@ def handle_highlights_in_executed_code(key, value, display_map, display_line,
         highlight_map[key] = {}
     if value['lineno'] in display_map:
         # Display executed code at the correct indentation
-        current_length = len(display_map[value['lineno']])
-        if current_length >= len(tabs):
-            tab_count += 2
-            tabs += '    '
-        display_map[value['lineno']] += tabs[current_length:] + \
-            display_line
+        # current_length = len(display_map[value['lineno']])
+        # if current_length >= len(tabs):
+        #     tab_count += 2
+        #     tabs += '    '
+        # display_map[value['lineno']] += tabs[current_length:] + \
+        #     display_line
+        display_map[key] = display_line
         # Mark lines start point
         highlight_map[key]['start'] = current_length + \
             len(tabs[current_length:])
     else:
         # Display executed code at the correct indentation
-        display_map[value['lineno']] = tabs + display_line
+        # display_map[value['lineno']] = tabs + display_line
+        display_map[key] = display_line
         # Mark lines start point
         highlight_map[key]['start'] = current_length + len(tabs)
     highlight_map[key]['lineno'] = value['lineno']
-    highlight_map[key]['end'] = len(display_map[value['lineno']])
+    # highlight_map[key]['end'] = len(display_map[value['lineno']])
+    highlight_map[key]['end'] = len(display_map[key])
     tab_count += 1
     return tab_count
 
@@ -412,6 +415,9 @@ def display_executed_code(executed_code, code_box,
 
             tab_count = handle_highlights_in_executed_code(key, value, display_map,
                                                        display_line, tab_count)
+            # print highlight_map
+            # print display_map
+            # print
         total -= 1
         start -= 1
 
@@ -511,18 +517,20 @@ def highlight_code(code_box):
         code_box.mark_set('range_start', 'range_end')
 
 
-def tag_add_highlight(widget, line, start, length):
+def tag_add_highlight(widget, line, call, start, length):
     global DO_NOT_RUN
     DO_NOT_RUN = True
     widget.tag_remove('HIGHLIGHT', '{0}.{1}'.format(line, start),
                       '{0}.{1}'.format(line, length))
     widget.tag_add('HIGHLIGHT', '{0}.{1}'.format(line, start),
                    '{0}.{1}'.format(line, length))
-    if line in display_map:
-        widget.insert('{0}.{1}'.format(line, length), '     {0}'.format(display_map[line].lstrip(' ')))
+    # if line in display_map:
+    #     widget.insert('{0}.{1}'.format(line, length), '     {0}'.format(display_map[line].lstrip(' ')))
+    if call in display_map:
+        widget.insert('{0}.{1}'.format(line, length), '     {0}'.format(display_map[call].lstrip(' ')))
 
 
-def tag_remove_highlight(widget, line, start, length):
+def tag_remove_highlight(widget, line, call, start, length):
     global DO_NOT_RUN
     widget.tag_remove('HIGHLIGHT', '{0}.{1}'.format(line, start),
                       '{0}.{1}'.format(line, length))
@@ -530,42 +538,43 @@ def tag_remove_highlight(widget, line, start, length):
     DO_NOT_RUN = False
 
 
-def optional_add_highlights(widget, lineno, line_start, line_length,
+def optional_add_highlights(widget, lineno, call, line_start, line_length,
                             lines=None):
     if lines is not None:
         for line in lines:
             end = len(user_code.split('\n')[line-1])
-            tag_add_highlight(widget, line, 0, end)
+            call += 1
+            tag_add_highlight(widget, line, call, 0, end)
 
-def optional_remove_highlights(widget, lineno, line_start, line_length,
+def optional_remove_highlights(widget, lineno, call, line_start, line_length,
                                lines=None):
     if lines is not None:
         for line in lines:
             end = len(user_code.split('\n')[line-1])
-            tag_remove_highlight(widget, line, 0, end)
+            tag_remove_highlight(widget, line, call, 0, end)
 
 
-def add_highlight(event, widget, lineno, line_start, line_length,
+def add_highlight(event, widget, lineno, call, line_start, line_length,
                   opt_widget=None, lines=None):
-    tag_add_highlight(widget, lineno, line_start, line_length)
+    tag_add_highlight(widget, lineno, call, line_start, line_length)
     if opt_widget is not None:
-        optional_add_highlights(opt_widget, lineno, line_start, line_length,
+        optional_add_highlights(opt_widget, lineno, call, line_start, line_length,
                                 lines)
 
 
-def remove_highlight(event, widget, lineno, line_start, line_length,
+def remove_highlight(event, widget, lineno, call, line_start, line_length,
                      opt_widget=None, lines=None):
-    tag_remove_highlight(widget, lineno, line_start, line_length)
+    tag_remove_highlight(widget, lineno, call, line_start, line_length)
     if opt_widget is not None:
-        optional_remove_highlights(opt_widget, lineno, line_start, line_length,
+        optional_remove_highlights(opt_widget, lineno, call, line_start, line_length,
                                    lines)
 
 
-def tag_add_code(event, widget, line):
-    if len(widget.get('{0}.0'.format(line), '{0}.end'.format(line))) > 1:
-        widget.delete('{0}.0'.format(line), '{0}.end'.format(line))
-    else:
-        widget.insert('{0}.end'.format(line), '     {0}'.format(display_map[line]))
+# def tag_add_code(event, widget, line):
+    # if len(widget.get('{0}.0'.format(line), '{0}.end'.format(line))) > 1:
+    #     widget.delete('{0}.0'.format(line), '{0}.end'.format(line))
+    # else:
+    #     widget.insert('{0}.end'.format(line), '     {0}'.format(display_map[line]))
 
 
 def display_func_output(event, executed_box, func_lineno, func_lines, selected_call):
@@ -681,8 +690,6 @@ def test_function_call(toplevel, executed_box, code, func_lineno, func_name,
     if bad_input:
         executed_box.insert(INSERT, '\nIf you meant to put a string, use quotes\nsuch as: \'INPUT\'\nor\nFor an empty string use: \'\'\n')
     else:
-        print 'TESTING'
-        print code
         with open('temp_user_code.py', "w") as code_file:
             code_file.write(code)
             code_file.close()
@@ -716,8 +723,8 @@ def test_function_call(toplevel, executed_box, code, func_lineno, func_name,
 def tag_function_calls(event, line, call_points):
     toplevel = Toplevel()
     selected_call = StringVar()
-    code_box = Text(toplevel, height=10, width=50)
-    executed_box = Text(toplevel, height=10, width=50)
+    code_box = Text(toplevel, height=10, width=50, wrap=NONE)
+    executed_box = Text(toplevel, height=10, width=50, wrap=NONE)
     combobox = ttk.Combobox(toplevel, textvariable=selected_call)
     labels = []
     entries = []
@@ -805,8 +812,8 @@ def tag_loops(event, line):
     toplevel = Toplevel()
     lines = data['loop_lines'][line]
     calls, length = get_loop_iteration_calls(line, lines)
-    code_box = Text(toplevel, height=10, width=50)
-    executed_box = Text(toplevel, height=10, width=50)
+    code_box = Text(toplevel, height=10, width=50, wrap=NONE)
+    executed_box = Text(toplevel, height=10, width=50, wrap=NONE)
     scale = Scale(toplevel, orient=HORIZONTAL, to=length-1,
                   command=lambda value, l=lines, c=calls, eb=executed_box:
                   display_loop_output(value, l, c, eb))
@@ -825,19 +832,22 @@ def tag_lines(code_box):
     global data
     user_code = code_box.get('0.0', 'end-1c')
     lines = str(user_code).split('\n')
-    line_count = 1
-    for line in lines:
-        if line_count in data:
-            code_box.tag_remove('line{0}'.format(line_count),
-                                '{0}.0'.format(line_count),
-                                '{0}.{1}'.format(line_count, len(line)))
-            code_box.tag_add('line{0}'.format(line_count),
-                             '{0}.0'.format(line_count),
-                             '{0}.{1}'.format(line_count, len(line)))
+    # line_count = 1
+    # for line in lines:
+    for call, values in executed_code.iteritems():
+        lineno = values['lineno']
+        line = lines[lineno-1]
+        if lineno in data:
+            code_box.tag_remove('line{0}'.format(lineno),
+                                '{0}.0'.format(lineno),
+                                '{0}.{1}'.format(lineno, len(line)))
+            code_box.tag_add('line{0}'.format(lineno),
+                             '{0}.0'.format(lineno),
+                             '{0}.{1}'.format(lineno, len(line)))
             additional_lines = []
-            if (data is not None and line_count in data and
-                    'additional_lines' in data[line_count]):
-                for name in data[line_count]['additional_lines']:
+            if (data is not None and lineno in data and
+                    'additional_lines' in data[lineno]):
+                for name in data[lineno]['additional_lines']:
                     if '.' in name:
                         name = name.split('.')[-1]
 
@@ -846,39 +856,39 @@ def tag_lines(code_box):
                     elif ('classes' in data and name in data['classes'] and
                             '__init__' in data['classes'][name]['functions']):
                         additional_lines.extend(data['classes'][name]['functions']['__init__'])
-            code_box.tag_unbind('line{0}'.format(line_count), '<Enter>')
-            code_box.tag_unbind('line{0}'.format(line_count), '<Leave>')
+            code_box.tag_unbind('line{0}'.format(lineno), '<Enter>')
+            code_box.tag_unbind('line{0}'.format(lineno), '<Leave>')
             code_box.tag_bind(
-                'line{0}'.format(line_count),
+                'line{0}'.format(lineno),
                 '<Enter>',
-                lambda event, widget=code_box, lineno=line_count,
+                lambda event, widget=code_box, lineno=lineno, call=call,
                 line_length=len(line), opt_widget=None,
                 lines=additional_lines: add_highlight(
-                    event, widget, lineno, 0, line_length, widget, lines))
+                    event, widget, lineno, call, 0, line_length, widget, lines))
             code_box.tag_bind(
-                'line{0}'.format(line_count),
+                'line{0}'.format(lineno),
                 '<Leave>',
-                lambda event, widget=code_box, lineno=line_count,
+                lambda event, widget=code_box, lineno=lineno, call=call,
                 line_length=len(line), opt_widget=None,
                 lines=additional_lines: remove_highlight(
-                    event, widget, lineno, 0, line_length, widget, lines))
-            if (line_count in data and 'type' in data[line_count] and
-                    'func' == data[line_count]['type']):
-                call_points = get_function_call_points(line_count)
-                code_box.tag_unbind('line{0}'.format(line_count), '<Button-1>')
+                    event, widget, lineno, call, 0, line_length, widget, lines))
+            if (lineno in data and 'type' in data[lineno] and
+                    'func' == data[lineno]['type']):
+                call_points = get_function_call_points(lineno)
+                code_box.tag_unbind('line{0}'.format(lineno), '<Button-1>')
                 code_box.tag_bind(
-                    'line{0}'.format(line_count),
+                    'line{0}'.format(lineno),
                     '<Button-1>',
-                    lambda event, lineno=line_count, cp=call_points:
+                    lambda event, lineno=lineno, cp=call_points:
                     tag_function_calls(event, lineno, cp))
-            if (line_count in data and 'type' in data[line_count] and
-                    'loop' == data[line_count]['type']):
-                code_box.tag_unbind('line{0}'.format(line_count), '<Button-1>')
+            if (lineno in data and 'type' in data[lineno] and
+                    'loop' == data[lineno]['type']):
+                code_box.tag_unbind('line{0}'.format(lineno), '<Button-1>')
                 code_box.tag_bind(
-                    'line{0}'.format(line_count),
+                    'line{0}'.format(lineno),
                     '<Button-1>',
-                    lambda event, lineno=line_count: tag_loops(event, lineno))
-        line_count += 1
+                    lambda event, lineno=lineno: tag_loops(event, lineno))
+        # line_count += 1
 
 
 def correct_mangled_variables():
@@ -1132,7 +1142,7 @@ class Application(Frame):
         # Left Frame
         code_title = Label(code_frame, text='Source Code')
         code_title.pack(side=TOP, fill=X)
-        code_box = Text(code_frame, foreground='white', background='gray15', height=55)
+        code_box = Text(code_frame, foreground='white', background='gray15', height=55, wrap=NONE)
         code_box.tag_configure('Token.Keyword', foreground='orange red')
         code_box.tag_configure('Token.Operator', foreground='orange red')
         code_box.tag_configure('Token.Name.Class', foreground='green yellow')

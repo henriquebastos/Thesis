@@ -1,3 +1,6 @@
+def long_name_function(long_name_variable_1, long_name_variable_2):
+   return long_name_variable_1 + long_name_variable_2
+
 def f(a, b, c, d):
    z = a + b + (c * d)
    return z
@@ -38,6 +41,9 @@ print a4
 f_2 = a4.append
 
 for i in [1,2,3,4]:
+   print i
+
+for i in a4:
    print i
 
 
@@ -104,7 +110,7 @@ a = 1
 b = 2
 c = sum(a,b)
 print c
-print sum(1, 2)
+print sum(5, 5)
 q = mult(a, b)
 c = 7
 d = 8
