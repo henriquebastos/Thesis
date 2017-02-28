@@ -36,7 +36,6 @@ input_event = threading.Event()
 rerun_event = threading.Event()
 exit_event = threading.Event()
 additional_lines_call_point = None
-scroll_position = None
 successful_exit = True
 
 generic_objects = {}
@@ -415,7 +414,7 @@ def display_objects(tree_wrapper, tree_viewer, combobox):
     combobox['values'] = tuple(root_objects_names)
 
 
-def reset_boxes(new_user_code, variable_box, output_box):
+def reset_boxes(variable_box, output_box):
     global variable_values
     variable_box.delete(0.0, END)
     output_box.delete(0.0, END)
@@ -506,18 +505,18 @@ def optional_remove_highlights(widget, lineno, call, line_start, line_length,
 
 
 def add_highlight(event, widget, lineno, call, line_start, line_length,
-                  opt_widget=None, lines=None):
+                  lines=None):
     tag_add_highlight(widget, lineno, call, line_start, line_length)
-    if opt_widget is not None:
-        optional_add_highlights(opt_widget, lineno, call, line_start, line_length,
+    if lines is not None:
+        optional_add_highlights(widget, lineno, call, line_start, line_length,
                                 lines)
 
 
 def remove_highlight(event, widget, lineno, call, line_start, line_length,
-                     opt_widget=None, lines=None):
+                     lines=None):
     tag_remove_highlight(widget, lineno, call, line_start, line_length)
-    if opt_widget is not None:
-        optional_remove_highlights(opt_widget, lineno, call, line_start, line_length,
+    if lines is not None:
+        optional_remove_highlights(widget, lineno, call, line_start, line_length,
                                    lines)
 
 
@@ -553,6 +552,7 @@ def display_func_output(event, executed_box, func_lineno, func_lines, selected_c
     executed_box.insert(INSERT, executed_output)
 
 
+# TODO
 def set_var_to_type(v):
     if v == 'None':
         return None
@@ -560,11 +560,17 @@ def set_var_to_type(v):
         return True
     elif v == 'False':
         return False
+    elif '[' in v and ']' in v:
+        r = []
+        v = v[1:-1]
+        for t in v.split(','):
+            r.append(set_var_to_type(t))
+        return r
     else:
         try:
             return int(v)
         except:
-            return v 
+            return v
 
 
 class TestFunctionThread(threading.Thread):
@@ -804,16 +810,16 @@ def bind_line_tags(code_box, lineno, call, line, additional_lines):
         'line{0}'.format(lineno),
         '<Enter>',
         lambda event, widget=code_box, lineno=lineno, call=call,
-        line_length=len(line), opt_widget=None,
+        line_length=len(line),
         lines=additional_lines: add_highlight(
-            event, widget, lineno, call, 0, line_length, widget, lines))
+            event, widget, lineno, call, 0, line_length, lines))
     code_box.tag_bind(
         'line{0}'.format(lineno),
         '<Leave>',
         lambda event, widget=code_box, lineno=lineno, call=call,
-        line_length=len(line), opt_widget=None,
+        line_length=len(line),
         lines=additional_lines: remove_highlight(
-            event, widget, lineno, call, 0, line_length, widget, lines))
+            event, widget, lineno, call, 0, line_length, lines))
 
 
 def set_function_tag(code_box, lineno):
@@ -953,18 +959,77 @@ def input_box_has_changes(lines):
     return has_changed
 
 
-def debug_loop(from_box, input_box, variable_box,
-               output_box, start_scale, scale,
-               tree_wrapper, tree_viewer, combobox):
+def run_user_code(code_box, new_user_code):
     global user_code
+    global communicationThread
+
+    highlight_code(code_box)
+    try:
+        if communicationThread is None:
+            user_code = new_user_code
+            with open(FILE_NAME, "w") as code_file:
+                code_file.write(user_code)
+                code_file.close()
+            communicationThread = CommunicationThread(FILE_NAME)
+            communicationThread.start()
+    except:
+        pass
+
+
+def on_scale_change(code_box, variable_box, output_box, start_scale, scale,
+                    tree_wrapper, tree_viewer, combobox):
+    global prev_scale_setting
+    global prev_start_scale_setting
+
+    prev_scale_setting = scale.get()
+    start_scale.config(to=prev_scale_setting)
+    prev_start_scale_setting = start_scale.get()
+    reset_boxes(variable_box, output_box)
+    reset_objects()
+    if executed_code is not None:
+        print executed_code
+        display_executed_code(executed_code, code_box,
+                              variable_box, output_box,
+                              start_scale.get(), scale.get())
+    display_objects(tree_wrapper, tree_viewer, combobox)
+
+
+def display_user_code(code_box, variable_box, output_box, start_scale, scale,
+                      tree_wrapper, tree_viewer, combobox):
     global scale_size
-    global executed_code
     global prev_scale_setting
     global prev_start_scale_setting
     global communicationThread
     global input_event
     global successful_exit
-    global scroll_position
+
+    input_event.clear()
+    communicationThread = None
+    if successful_exit:
+        successful_exit = False
+        reset_boxes(variable_box,
+                    output_box)
+        tag_lines(code_box)
+        scale_size = len(executed_code)
+        scale.config(to=scale_size)
+        scale.set(scale_size)
+        prev_scale_setting = scale_size
+        start_scale.config(to=scale_size)
+        prev_start_scale_setting = start_scale.get()
+        display_executed_code(executed_code, code_box,
+                              variable_box, output_box, start_scale.get(),
+                              scale_size)
+        display_objects(tree_wrapper, tree_viewer, combobox)
+
+
+def main_loop(from_box, input_box, variable_box,
+               output_box, start_scale, scale,
+               tree_wrapper, tree_viewer, combobox):
+    global user_code
+    global prev_scale_setting
+    global prev_start_scale_setting
+    global communicationThread
+    global input_event
     global rerun_event
 
     if exit_event.isSet():
@@ -973,58 +1038,15 @@ def debug_loop(from_box, input_box, variable_box,
         new_user_code = from_box.get(0.0, END)[:-1]
 
         if user_code != new_user_code:
-            highlight_code(from_box)
-            try:
-                if communicationThread is None:
-                    user_code = new_user_code
-                    with open(FILE_NAME, "w") as code_file:
-                        code_file.write(user_code)
-                        code_file.close()
-                    communicationThread = CommunicationThread('user_code.py')
-                    communicationThread.start()
-            except:
-                pass
+            run_user_code(from_box, new_user_code)
         elif (scale.get() != prev_scale_setting or 
                 start_scale.get() != prev_start_scale_setting):
-            prev_scale_setting = scale.get()
-            start_scale.config(to=prev_scale_setting)
-            prev_start_scale_setting = start_scale.get()
-            reset_boxes(new_user_code, variable_box, output_box)
-            reset_objects()
-            if executed_code is not None:
-                display_executed_code(executed_code, from_box,
-                                      variable_box, output_box,
-                                      start_scale.get(), scale.get())
-            display_objects(tree_wrapper, tree_viewer, combobox)
-            if scroll_position is not None:
-                scrolled_text_pair.right.configure(
-                    yscrollcommand=scrolled_text_pair.on_textscroll)
-                scrolled_text_pair.right.yview('moveto', scroll_position[0])
-                scroll_position = None
+            on_scale_change(from_box, variable_box, output_box, start_scale,
+                            scale, tree_wrapper, tree_viewer, combobox)
 
         if communicationThread is not None and not communicationThread.isAlive():
-            input_event.clear()
-            communicationThread = None
-            if successful_exit:
-                successful_exit = False
-                reset_boxes(new_user_code, variable_box,
-                            output_box)
-                tag_lines(from_box)
-                scale_size = len(executed_code)
-                scale.config(to=scale_size)
-                scale.set(scale_size)
-                prev_scale_setting = scale_size
-                start_scale.config(to=scale_size)
-                prev_start_scale_setting = start_scale.get()
-                display_executed_code(executed_code, from_box,
-                                      variable_box, output_box, start_scale.get(),
-                                      scale_size)
-                display_objects(tree_wrapper, tree_viewer, combobox)
-                if scroll_position is not None:
-                    scrolled_text_pair.right.configure(
-                        yscrollcommand=scrolled_text_pair.on_textscroll)
-                    scrolled_text_pair.right.yview('moveto', scroll_position[0])
-                    scroll_position = None
+            display_user_code(from_box, variable_box, output_box, start_scale,
+                              scale, tree_wrapper, tree_viewer, combobox)
 
         # Check for new input
         lines = str(input_box.get(0.0, END)[:-1]).split('\n')[:-1]
@@ -1045,7 +1067,7 @@ def debug_loop(from_box, input_box, variable_box,
             rerun_event.clear()
             user_code = ''
 
-    root.after(500, debug_loop, from_box, input_box,
+    root.after(500, main_loop, from_box, input_box,
                variable_box, output_box, start_scale, scale,
                tree_wrapper, tree_viewer, combobox)
 
@@ -1168,7 +1190,7 @@ class Application(Frame):
         output_box = Text(output_frame)
         output_box.pack(side=TOP, fill=Y)
 
-        root.after(500, debug_loop, code_box, input_box,
+        root.after(500, main_loop, code_box, input_box,
                    variable_box, output_box, start_execution_step,
                    execution_step, tree_wrapper,
                    tree_viewer, combobox)

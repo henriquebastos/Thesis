@@ -1,8 +1,5 @@
-def f(a, b, c, d):
-   z = a + b + (c * d)
-   return z
-a = 2
-b = 2
-c = 2
-d = 2
-f(a,b,c,d)
+def long_name_function(long_name_variable_1, long_name_variable_2):
+   return long_name_variable_1 + long_name_variable_2
+long_name_variable_1 = 'hi'
+long_name_variable_2 = 'farewell'
+long_name_function(long_name_variable_1,long_name_variable_2)
