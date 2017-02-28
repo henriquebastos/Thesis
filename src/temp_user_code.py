@@ -1,6 +1,8 @@
-def mult(x,y):
-   z = x * y
+def f(a, b, c, d):
+   z = a + b + (c * d)
    return z
-x = 24
-y = 2
-mult(x,y)
+a = 2
+b = 2
+c = 2
+d = 2
+f(a,b,c,d)
