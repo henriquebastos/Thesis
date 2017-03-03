@@ -140,7 +140,7 @@ def combine_additional_lines(lineno, target_data, from_data):
             from_data[lineno]['additional_lines']
 
 
-def combine_classes(lineno, target_data, from_data):
+def combine_classes(target_data, from_data):
     if 'classes' in from_data:
         if 'classes' not in target_data:
             target_data['classes'] = from_data['classes']
@@ -148,6 +148,11 @@ def combine_classes(lineno, target_data, from_data):
             for func, lines in from_data['classes'].items():
                 if func not in target_data['classes']:
                     target_data['classes'][func] = lines
+
+
+def combine_name(lineno, target_data, from_data):
+    if lineno in from_data and 'name' in from_data[lineno]:
+        target_data[lineno]['name'] = from_data[lineno]['name']
 
 
 def combine_data(lineno, target_data, from_data):
@@ -158,7 +163,8 @@ def combine_data(lineno, target_data, from_data):
     combine_function_lines(lineno, target_data, from_data)
     combine_loop_lines(lineno, target_data, from_data)
     combine_additional_lines(lineno, target_data, from_data)
-    combine_classes(lineno, target_data, from_data)
+    combine_classes(target_data, from_data)
+    combine_name(lineno, target_data, from_data)
 
 
 def combine_all_data(target_data, from_data):

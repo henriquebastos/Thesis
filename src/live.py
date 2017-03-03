@@ -48,6 +48,7 @@ root_objects = None
 DO_NOT_RUN = False
 display_map = {}
 
+
 def get_function_call_lineno(call, lineno):
     for line, values in additional_lines_call_point.iteritems():
         for additional_line, additional_calls in values.iteritems():
@@ -145,11 +146,12 @@ def display_variables(variable_box, call_num):
 
 def get_scope(lineno):
     global data
-    if 'function_lines' in data:
-        for func, lines in data['function_lines'].items():
-            for line in lines:
-                if lineno == line:
-                    return func
+    if 'function_lines' in data and 'name' in data[lineno]:
+        return data[lineno]['name']
+        # for func, lines in data['function_lines'].items():
+        #     for line in lines:
+        #         if lineno == line:
+        #             return func
     return 'global'
 
 
@@ -573,6 +575,91 @@ def set_var_to_type(v):
             return v
 
 
+def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
+                    labels, entries):
+    executed_box.delete(0.0, END)
+    variables = []
+    bad_input = False
+    offset = 0
+    index = 0
+    line_length = len(code.split('\n'))
+    used_labels = []
+    for (l, e) in zip(labels, entries):
+        l_text = l.cget('text').rstrip(':')
+        if e.get() == '':
+            bad_input = True
+            executed_box.insert(INSERT, 'Variable {0}: Invalid Input.\n'.format(l_text))
+        elif e.get() != '__NULL__':
+            e_text = set_var_to_type(e.get())
+            code += '{0} = {1}\n'.format(l_text, e_text)
+            used_labels.append(l_text)
+            offset += 1
+        else:
+            break
+        index += 1
+    code += '_test_obj_={0}('.format(data[class_lineno]['name'])
+    for l in used_labels:
+        code += '{0},'.format(l.rstrip(':'))
+    code = code.rstrip(',')
+    code += ')\n'
+    offset += 1
+    
+    while index < len(labels):
+        used_labels = []
+        func_name = labels[index].cget('text').rstrip(':')
+        index += 1
+        for (l, e) in zip(labels[index:], entries[index:]):
+            l_text = l.cget('text').rstrip(':')
+            if e.get() == '':
+                bad_input = True
+                executed_box.insert(INSERT, 'Variable {0}: Invalid Input.\n'.format(l_text))
+            elif e.get() != '__NULL__':
+                e_text = set_var_to_type(e.get())
+                code += '{0} = {1}\n'.format(l_text, e_text)
+                used_labels.append(l_text)
+                offset += 1
+            else:
+                break
+            index += 1
+        code += '_test_obj_.{0}('.format(func_name)
+        for l in used_labels:
+            code += '{0},'.format(l.rstrip(':'))
+        code = code.rstrip(',')
+        code += ')\n'
+    offset += 1
+    if bad_input:
+        executed_box.insert(INSERT, '\nIf you meant to put a string, use quotes\nsuch as: \'INPUT\'\nor\nFor an empty string use: \'\'\n')
+    else:
+        with open('temp_user_code.py', "w") as code_file:
+            code_file.write(code)
+            code_file.close()
+        functionThread = TestFunctionThread('temp_user_code.py')
+        functionThread.start()
+        while not functionThread.complete and functionThread.isAlive():
+            time.sleep(0.25)
+            pass
+        functionThread.stop()
+        if functionThread.success:
+            for l in range(line_length):
+                executed_box.insert(INSERT, '\n')
+            executed_output = ''
+            for call_no, values in functionThread.executed_code.iteritems():
+                if int(values['lineno']) < line_length and int(values['lineno']) != 1:
+                    # Get executed_code
+                    executed_line = None
+                    if 'result' in functionThread.executed_code[call_no]:
+                        executed_line = functionThread.executed_code[call_no]['result']
+                    else:
+                        for variable, value in functionThread.executed_code[call_no]['values'].iteritems():
+                            if executed_line is None:
+                                executed_line = '{0}={1}'.format(variable, value)
+                            else:
+                                executed_line += ',{0}={1}'.format(variable, value)
+                    executed_box.insert('{0}.end'.format(values['lineno']), '{0}    '.format(executed_line))
+        else:
+            executed_box.insert(INSERT, 'There was an error with your code. Please try again or modify your input\n')
+
+
 class TestFunctionThread(threading.Thread):
     def __init__(self, filename):
         self.executed_code = None
@@ -588,6 +675,7 @@ class TestFunctionThread(threading.Thread):
             communicator = Communicate.main(self.filename, self.stop_event,
                                             input_event, user_inputs)
             if not self.stop_event.isSet():
+                self.data = communicator.data
                 self.executed_code = communicator.executed_code
                 self.variable_values_per_line = communicator.variable_values
                 self.correct_mangled_variables()
@@ -597,9 +685,15 @@ class TestFunctionThread(threading.Thread):
             self.success = False
         self.complete = True
 
+    def get_scope(self, lineno):
+        if 'function_lines' in self.data and 'name' in self.data[lineno]:
+            return self.data[lineno]['name']
+        return 'global'
+
+
     def correct_mangled_variables(self):
         for call, evaluated in self.executed_code.iteritems():
-            scope = get_scope(evaluated['lineno'])
+            scope = self.get_scope(evaluated['lineno'])
             for key, value in evaluated['values'].iteritems():
                 try:
                     correct_value = self.variable_values_per_line[call-1][scope][key]
@@ -670,6 +764,102 @@ def test_function_call(toplevel, executed_box, code, func_lineno, func_name,
             executed_box.insert(INSERT, 'There was an error with your code. Please try again or modify your input\n')
 
 
+def add_class_function(event, widget, code_box, executed_box, label, combobox,
+                       selected, labels, entries, r):
+    print selected.get()
+    labels.append(Label(widget, text='{0}:'.format(selected.get())))
+    entries.append(Entry(widget))
+    entries[-1].insert(INSERT, '__NULL__')
+    new_labels = []
+    new_entries = []
+    if 'function_lines' in data and selected.get() in data['function_lines']:
+        print type(selected.get())
+        print data['function_lines']
+        func_line = data['function_lines'][selected.get()][0]
+        for expr in data[func_line]['expressions']:
+            new_labels.append(Label(widget, text='{0}:'.format(expr)))
+            new_entries.append(Entry(widget))
+    labels[-1].grid(row=r, column=0)
+    r += 1
+    c = 0
+    for l, e in zip(new_labels, new_entries):
+        l.grid(row=r, column=c, sticky='E')
+        e.grid(row=r, column=c+1, sticky='W')
+        c += 2
+        if c >= 4:
+            r += 1
+            c = 0
+    r += 1
+    label.grid(row=r, column=2)
+    combobox.grid(row=r, column=3)
+    labels.extend(new_labels)
+    entries.extend(new_entries)
+    combobox.unbind('<<ComboboxSelected>>')
+    combobox.bind('<<ComboboxSelected>>', lambda event, w=widget,
+                  cb=code_box, eb=executed_box, lab=label, comb_b=combobox,
+                  s=selected, l=labels, e=entries, r=r: 
+                  add_class_function(event, w, cb, eb, lab, comb_b, s, l, e, r))
+
+def tag_class(event, line):
+    toplevel = Toplevel()
+    code_box = Text(toplevel, height=10, width=50, wrap=NONE)
+    executed_box = Text(toplevel, height=10, width=50, wrap=NONE)
+    class_lines = [line]
+    labels = []
+    entries = []
+    func_names = []
+    if ('classes' in data and line in data and 'name' in data[line] and
+            data[line]['name'] in data['classes'] and
+            'functions' in data['classes'][data[line]['name']]):
+        for func, lines in data['classes'][data[line]['name']]['functions'].iteritems():
+            class_lines.extend(lines)
+            if func != '__init__':
+                func_names.append(func)
+            else:
+                for expr in data[lines[0]]['expressions']:
+                    labels.append(Label(toplevel, text='{0}:'.format(expr)))
+                    entries.append(Entry(toplevel))
+    class_lines.sort()
+    code_output = ''
+    for l in class_lines:
+        code_output += '{0}\n'.format(str(user_code.split('\n')[l-1]))
+    code_box.insert(INSERT, code_output)
+
+    # Add __init__ labels and entries
+    r = 2
+    c = 0
+    for l, e in zip(labels, entries):
+        l.grid(row=r, column=c, sticky='E')
+        e.grid(row=r, column=c+1, sticky='W')
+        c += 2
+        if c >= 4:
+            r += 1
+            c = 0
+    # Add button below
+    r += 1
+    selected = StringVar()
+    label = Label(toplevel, text='Add Function Call')
+    label.grid(row=r, column=2)
+    combobox = ttk.Combobox(toplevel, values=tuple(func_names), 
+                            textvariable=selected, state='readonly')
+    combobox.grid(row=r, column=3)
+    combobox.unbind('<<ComboboxSelected>>')
+    combobox.bind('<<ComboboxSelected>>', lambda event, w=toplevel,
+                  cb=code_box, eb=executed_box, lab=label, comb_b=combobox,
+                  s=selected, l=labels, e=entries, r=r: 
+                  add_class_function(event, w, cb, eb, lab, comb_b, s, l, e, r))
+    # Add function labels and entries
+    # Add button Below and
+    # a run button
+    test_class_button = Button(toplevel, text='Test Class',
+        command=lambda tl=toplevel, eb=executed_box, c=code_output, c_lno=line,
+        c_lines=class_lines, l=labels, e=entries:
+        test_class_call(tl, eb, c, c_lno, c_lines, l, e))
+    test_class_button.grid(row=0, column=3)
+    code_box.grid(row=1, column=0, columnspan=2)
+    executed_box.grid(row=1, column=2, columnspan=2)
+
+
 def tag_function_calls(event, line, call_points):
     toplevel = Toplevel()
     selected_call = StringVar()
@@ -683,12 +873,14 @@ def tag_function_calls(event, line, call_points):
         entries.append(Entry(toplevel))
     func_lines = []
     func_name = ''
-    if 'function_lines' in data:
-        for func, lines in data['function_lines'].iteritems():
-            if line in lines:
-                func_name = func
-                func_lines = lines
-                continue
+    if 'name' in data[line] and 'function_lines' in data:
+        func_name = data[line]['name']
+        data['function_lines'][func_name]
+        # for func, lines in data['function_lines'].iteritems():
+        #     if line in lines:
+        #         func_name = func
+        #         func_lines = lines
+        #         continue
     code_output = ''
     for l in func_lines:
         code_output += '{0}\n'.format(str(user_code.split('\n')[l-1]))
@@ -822,16 +1014,36 @@ def bind_line_tags(code_box, lineno, call, line, additional_lines):
             event, widget, lineno, call, 0, line_length, lines))
 
 
+def set_class_tag(code_box, lineno):
+    if (lineno in data and 'type' in data[lineno] and
+            'class' == data[lineno]['type']):
+        code_box.tag_unbind('line{0}'.format(lineno), '<Button-1>')
+        code_box.tag_bind(
+            'line{0}'.format(lineno),
+            '<Button-1>',
+            lambda event, lineno=lineno:
+            tag_class(event, lineno))
+
+
 def set_function_tag(code_box, lineno):
     if (lineno in data and 'type' in data[lineno] and
             'func' == data[lineno]['type']):
         call_points = get_function_call_points(lineno)
         code_box.tag_unbind('line{0}'.format(lineno), '<Button-1>')
-        code_box.tag_bind(
-            'line{0}'.format(lineno),
-            '<Button-1>',
-            lambda event, lineno=lineno, cp=call_points:
-            tag_function_calls(event, lineno, cp))
+        should_bind = True
+        if lineno in data and 'classes' in data:
+            for class_name, class_items in data['classes'].iteritems():
+                if 'functions' in class_items:
+                    for func, lines in class_items['functions'].iteritems():
+                        if lineno in lines:
+                            should_bind = False
+                            break
+        if should_bind:
+            code_box.tag_bind(
+                'line{0}'.format(lineno),
+                '<Button-1>',
+                lambda event, lineno=lineno, cp=call_points:
+                tag_function_calls(event, lineno, cp))
 
 
 def set_loop_tag(code_box, lineno):
@@ -851,19 +1063,21 @@ def tag_lines(code_box):
     called_lines = {}
     for call, values in executed_code.iteritems():
         lineno = values['lineno']
-        called_lines[lineno] = True
         line = lines[lineno-1]
-        if lineno in data:
+        if lineno in data and lineno not in called_lines:
+            called_lines[lineno] = True
             set_line_tag(code_box, lineno, line)
             additional_lines = get_additional_lines(lineno)
             bind_line_tags(code_box, lineno, call, line, additional_lines)
             set_function_tag(code_box, lineno)
+            set_class_tag(code_box, lineno)
             set_loop_tag(code_box, lineno)
     lineno = 0
     for line in lines:
         if lineno in data and lineno not in called_lines:
             set_line_tag(code_box, lineno, line)
             set_function_tag(code_box, lineno)
+            set_class_tag(code_box, lineno)
         lineno += 1
 
 
