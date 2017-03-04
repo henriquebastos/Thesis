@@ -78,7 +78,8 @@ class Pdb(bdb.Bdb, cmd.Cmd):
         cmd.Cmd.__init__(self, completekey, stdin, stdout)
         if stdout:
             self.use_rawinput = 0
-        self.prompt = '(Pdb) '
+        # self.prompt = '(Pdb) '
+        self.prompt = ''
         self.aliases = {}
         self.mainpyfile = ''
         self._wait_for_mainpyfile = 0

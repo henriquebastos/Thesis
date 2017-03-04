@@ -278,6 +278,7 @@ def check_function_variables_arguments(lineno, values):
 
 def handle_assignment_in_executed_code(value, call_num):
     scope = get_scope(value['lineno'])
+    # print 'HANDLE ASSIGNMENT: {0}'.format(scope)
     variable = value['result'].split('=')[0]
     if '=' in value['result']:
         result = value['result'].split('=')[1]
@@ -342,6 +343,7 @@ def handle_functions_in_executed_code(value, call_num):
     display_line = ''
     no_comma = True
     scope = get_scope(value['lineno'])
+    # print 'HANDLE FUNCTION: {0}'.format(scope)
     for k, v in value['values'].iteritems():
         if no_comma:
             no_comma = False
@@ -1217,7 +1219,8 @@ def correct_mangled_variables():
             try:
                 correct_value = variable_values_per_line[call-1][scope][key]
                 correct_result = variable_values_per_line[call][scope][key]
-                if value != correct_value:
+                if value != correct_value: # and 'instance at 0x' not in value:
+                    # print 'CORRECTING: {0} --> from {1} --> to {2} --> result {3}'.format(key, value, correct_value, correct_result)
                     executed_code[call]['values'][key] = correct_value
                     if value == evaluated['result']:
                         executed_code[call]['result'] = correct_result
@@ -1329,7 +1332,6 @@ def on_scale_change(code_box, variable_box, output_box, start_scale, scale,
     reset_boxes(variable_box, output_box)
     reset_objects()
     if executed_code is not None:
-        print executed_code
         display_executed_code(executed_code, code_box,
                               variable_box, output_box,
                               start_scale.get(), scale.get())
