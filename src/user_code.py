@@ -13,9 +13,8 @@ a = 1
 b = 2
 i = 0
 
-
 while i < 3:
-   a = f(a, b, 0, 0) + g() + 88
+   a = f(a, b, 0, 0) + g()
    i += 1
 
 print a
@@ -143,3 +142,4 @@ print user_input
 print user_input + 1
 user_input2 = input()
 print user_input2
+

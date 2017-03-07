@@ -499,8 +499,8 @@ def tag_add_highlight(widget, line, call, start, length):
 
 def tag_remove_highlight(widget, line, call, start, length):
     global DO_NOT_RUN
+    widget.config(state=NORMAL)
     if communicationThread is None:
-        widget.config(state=NORMAL)
         widget.tag_remove('HIGHLIGHT', '{0}.{1}'.format(line, start),
                           '{0}.{1}'.format(line, length))
         widget.delete('{0}.{1}'.format(line, length), '{0}.end'.format(line))
@@ -1442,13 +1442,13 @@ def main_loop(scrolled_text_pair, lineno_box, from_box, input_box, variable_box,
 
         if user_code != new_user_code:
             scroll_position = scrolled_text_pair.scrollbar.get()
-            scrolled_text_pair.right.configure(yscrollcommand=None, state=DISABLED)
+            scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
             set_line_numbers(lineno_box, len(new_user_code.split('\n')))
             run_user_code(from_box, new_user_code)
         elif (scale.get() != prev_scale_setting or 
                 start_scale.get() != prev_start_scale_setting):
             # scroll_position = scrolled_text_pair.scrollbar.get()
-            # scrolled_text_pair.right.configure(yscrollcommand=None, state=DISABLED)
+            # scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
             on_scale_change(from_box, variable_box, output_box, start_scale,
                             scale, tree_wrapper, tree_viewer, combobox)
             # if scroll_position is not None:
@@ -1604,31 +1604,6 @@ class Application(Frame):
         lineno_box.config(state=DISABLED)
         code_box = paired_text_boxes.right
         paired_text_boxes.pack()
-        # lineno_box = Text(code_frame, foreground='gray', background='gray15', height=55, width=3, wrap=NONE)
-        # code_box = Text(code_frame, foreground='white', background='gray15', height=55, wrap=NONE)
-        # code_box.tag_configure('Token.Keyword', foreground='orange red')
-        # code_box.tag_configure('Token.Operator', foreground='orange red')
-        # code_box.tag_configure('Token.Name.Class', foreground='green yellow')
-        # code_box.tag_configure('Token.Name.Function', foreground='green yellow')
-        # code_box.tag_configure('Token.Literal.Number.Integer',
-        #                         foreground='medium orchid')
-        # code_box.tag_configure('Token.Name.Builtin', foreground='medium turquoise')
-        # code_box.tag_configure('Token.Literal.String.Single',
-        #                         foreground='yellow')
-        # code_box.tag_configure('Token.Name.Builtin.Pseudo',
-        #                         foreground='orange')
-        # code_box.tag_configure('HIGHLIGHT', background='gray5')
-        # if os.path.isfile(FILE_NAME):
-        #     with open(FILE_NAME, 'r') as code_file:
-        #         lines = code_file.readlines()
-        #         lineno = 1
-        #         for line in lines:
-        #             code_box.insert(INSERT, line)
-        #             lineno_box.insert(INSERT, '{0}\n'.format(lineno))
-        #             lineno += 1
-        #         code_file.close()
-        # lineno_box.pack(side=LEFT, fill=Y)
-        # code_box.pack(side=LEFT, fill=Y)
 
         # Center Frame
         variable_title = Label(variable_frame, text='Variables')
