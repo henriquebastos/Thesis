@@ -105,20 +105,16 @@ class Communicator(object):
                     os.write(self.fd_write_2, 'p {0}\n'.format(variable))
                     result = os.read(self.fd_read_2, 1000)
                     result = result.rstrip('\n')
-                    os.write(self.fd_write_2, 'p type({0})\n'.format(variable))
-                    result_type = os.read(self.fd_read_2, 1000)
-                    result_type = result_type.rstrip('\n')
-                    if result_type == '<type \'list\'>':
-                        if (self.call > 0 and '*** NameError' not in result and
-                                '<built-in method' not in result and
-                                'instance at 0x' not in result):
-                            if '.' not in variable:
-                                if self.call-1 not in self.variable_values:
-                                    self.variable_values[self.call-1] = {}
-                                if scope not in self.variable_values[self.call-1]:
-                                    self.variable_values[self.call-1][scope] = {}
-                                self.variable_values[self.call-1][scope][variable] = result
-                                os.write(self.fd_write, '!{0}={1}\n'.format(variable, result))
+                    if (self.call > 0 and '*** NameError' not in result and
+                            '<built-in method' not in result and
+                            'instance at 0x' not in result):
+                        if '.' not in variable:
+                            if self.call-1 not in self.variable_values:
+                                self.variable_values[self.call-1] = {}
+                            if scope not in self.variable_values[self.call-1]:
+                                self.variable_values[self.call-1][scope] = {}
+                            self.variable_values[self.call-1][scope][variable] = result
+                            os.write(self.fd_write, '!{0}={1}\n'.format(variable, result))
 
 
     def parse_line(self, line):

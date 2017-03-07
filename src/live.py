@@ -113,7 +113,6 @@ def display_variables(variable_box, call_num):
     # print 'Additional Lines Call Point:'
     # for k,v in additional_lines_call_point.items():
     #     print '\t{0}: {1}'.format(k,v)
-
     variable_box.delete(0.0, END)
     for func, variables in variable_scope.items():
         func_lines = None
@@ -121,14 +120,11 @@ def display_variables(variable_box, call_num):
             func_lines = data['function_lines'][func]
         variables_line = ''
         for variable in variables:
-            if (func in variable_values and variable in variable_values[func] and
-                variable_declared_in_scope(variable, func, func_lines)):
-
+            if variable_declared_in_scope(variable, func, func_lines):
                 if (call_num in variable_values_per_line and
                         func in variable_values_per_line[call_num] and
                         variable in variable_values_per_line[call_num][func] and
                         variable_values_per_line[call_num][func][variable] is not None):
-                    
                     result = variable_values_per_line[call_num][func][variable]
                     if 'instance' in result and '.' in result:
                         variables_line += '{0}={1}\n'.format(
@@ -136,7 +132,11 @@ def display_variables(variable_box, call_num):
                     else:
                         variables_line += '{0}={1}\n'.format(
                             variable, result)
-                else:
+                        if func not in variable_values:
+                            variable_values[func] = {}
+                        variable_values[func][variable] = result
+                elif (func in variable_values and 
+                        variable in variable_values[func]):
                     variables_line += '{0}={1}\n'.format(
                         variable, variable_values[func][variable])
         if variables_line != '':
@@ -321,6 +321,7 @@ def handle_additional_lines_in_executed_code(value):
 
 
 def get_display_line_in_executed_code(value):
+    result = ''
     if 'instance at' in value['result'] and '.' in value['result']:
         try:
             variable = value['result'].split('=')[0]
@@ -331,19 +332,21 @@ def get_display_line_in_executed_code(value):
             return '{1}_{2}'.format(variable, class_name, obj.simple_id)
         except:
             if '=' in value['result']:
-                value['result'] = value['result'].split('=')[1]
-            return '{0}'.format(value['result'])
+                result = value['result'].split('=')[1]
+            else:
+                result = value['result']
     else:
         if '=' in value['result']:
-            value['result'] = value['result'].split('=')[1]
-        return '{0}'.format(value['result'])
+            result = value['result'].split('=')[1]
+        else:
+            result = value['result']
+    return result
 
 
 def handle_functions_in_executed_code(value, call_num):
     display_line = ''
     no_comma = True
     scope = get_scope(value['lineno'])
-    # print 'HANDLE FUNCTION: {0}'.format(scope)
     for k, v in value['values'].iteritems():
         if no_comma:
             no_comma = False
