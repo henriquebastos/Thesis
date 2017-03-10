@@ -6,6 +6,7 @@ import os
 import ScrolledText as ST
 import threading
 import time
+import traceback
 
 from pygments import lex
 from pygments.lexers import PythonLexer
@@ -677,12 +678,12 @@ def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
             pass
         functionThread.stop()
         if functionThread.success:
-            for l in range(line_length):
-                executed_box.insert(INSERT, '\n')
-            executed_output = ''
-            tabs = -1
+            # for l in range(line_length):
+            #     executed_box.insert(INSERT, '\n')
+            # tabs = -1
             prev_scope = None
             simple_id = 0
+            executed_lines = ''
             for call_no, values in functionThread.executed_code.iteritems():
                 if int(values['lineno']) < line_length and int(values['lineno']) != 1:
                     # Get executed_code
@@ -717,9 +718,11 @@ def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
                     scope = functionThread.get_scope(values['lineno'])
                     if scope != prev_scope:
                         prev_scope = scope
-                        tabs += 1
-                    executed_line = '{0}{1}'.format(tabs * '  ', executed_line)
-                    executed_box.insert('{0}.end'.format(values['lineno']), '{0}    '.format(executed_line))
+                        # tabs += 1
+                    # executed_line = '{0}{1}'.format(tabs * '  ', executed_line)
+                    executed_lines += '{0}: {1}\n'.format(values['lineno'], executed_line)
+                    # executed_box.insert('{0}.end'.format(values['lineno']), '{0}    '.format(executed_line))
+            executed_box.insert(INSERT, executed_lines)
         else:
             executed_box.insert(INSERT, 'There was an error with your code. Please try again or modify your input\n')
     executed_box.config(state=DISABLED)
@@ -908,9 +911,14 @@ def tag_class(event, line):
     code_box.config(height=len(class_lines)+2)
     executed_box.config(height=len(class_lines)+2)
     code_output = ''
+    code_box_lines = ''
+    i = 1
     for l in class_lines:
         code_output += '{0}\n'.format(str(user_code.split('\n')[l-1]))
-    code_box.insert(INSERT, code_output)
+        s_i = '{0}:'.format(i)
+        code_box_lines += '{0} {1}\n'.format(s_i.rjust(3, ' '), str(user_code.split('\n')[l-1]))
+        i += 1
+    code_box.insert(INSERT, code_box_lines)
     code_box.config(state=DISABLED)
 
     # Add __init__ labels and entries
@@ -1263,10 +1271,11 @@ def correct_mangled_variables():
 
 
 class CommunicationThread(threading.Thread):
-    def __init__(self, filename):
+    def __init__(self, filename, variable_box):
         threading.Thread.__init__(self)
         self.filename = filename
         self.stop_event = threading.Event()
+        self.variable_box = variable_box
 
     def run(self):
         global executed_code
@@ -1292,11 +1301,26 @@ class CommunicationThread(threading.Thread):
                 successful_exit = True
         except Exception as e:
             print 'ERROR ERROR ERROR'
+            self.variable_box.config(state=NORMAL)
+            self.variable_box.delete(0.0, END)
+            self.variable_box.insert(INSERT, self.get_error_message(traceback.format_exc()))
+            self.variable_box.config(state=DISABLED)
             successful_exit = False
             self.stop()
 
     def stop(self):
         self.stop_event.set()
+
+    def get_error_message(self, traceback_message):
+        error_message = ''
+        add_lines = False
+        for line in traceback_message.split('\n'):
+            if 'File \"<unknown>\", line' in line:
+                add_lines = True
+                line = 'Line: {0}'.format(line.lstrip('File \"<unknown>\", '))
+            if add_lines:
+                error_message += '{0}\n'.format(line)
+        return error_message
 
 
 def check_for_new_input(lines):
@@ -1350,7 +1374,7 @@ def reset_tags(code_box):
     code_box.tag_configure('HIGHLIGHT', background='gray5')
 
 
-def run_user_code(code_box, new_user_code):
+def run_user_code(code_box, new_user_code, variable_box):
     global user_code
     global communicationThread
 
@@ -1362,7 +1386,7 @@ def run_user_code(code_box, new_user_code):
             with open(FILE_NAME, "w") as code_file:
                 code_file.write(user_code)
                 code_file.close()
-            communicationThread = CommunicationThread(FILE_NAME)
+            communicationThread = CommunicationThread(FILE_NAME, variable_box)
             communicationThread.start()
     except:
         pass
@@ -1444,7 +1468,7 @@ def main_loop(scrolled_text_pair, lineno_box, from_box, input_box, variable_box,
             scroll_position = scrolled_text_pair.scrollbar.get()
             scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
             set_line_numbers(lineno_box, len(new_user_code.split('\n')))
-            run_user_code(from_box, new_user_code)
+            run_user_code(from_box, new_user_code, variable_box)
         elif (scale.get() != prev_scale_setting or 
                 start_scale.get() != prev_start_scale_setting):
             # scroll_position = scrolled_text_pair.scrollbar.get()
