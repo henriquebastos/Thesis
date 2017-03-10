@@ -1,3 +1,4 @@
+import ast
 from Tkinter import *
 from tkinter import ttk
 from tkMessageBox import showinfo
@@ -591,25 +592,12 @@ def display_func_output(event, executed_box, func_lineno, func_lines, selected_c
     executed_box.config(state=DISABLED)
 
 
-# TODO
 def set_var_to_type(v):
-    if v == 'None':
-        return None
-    elif v == 'True':
-        return True
-    elif v == 'False':
-        return False
-    elif '[' in v and ']' in v:
-        r = []
-        v = v[1:-1]
-        for t in v.split(','):
-            r.append(set_var_to_type(t))
-        return r
-    else:
-        try:
-            return int(v)
-        except:
-            return v
+    try:
+        v = ast.literal_eval(v)
+    except ValueError:
+        pass
+    return v
 
 
 def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
@@ -791,8 +779,11 @@ def test_function_call(toplevel, executed_box, code, func_lineno, func_name,
         if e.get() == '':
             bad_input = True
             executed_box.insert(INSERT, 'Variable {0}: Invalid Input.\n'.format(l_text))
-        e_text = set_var_to_type(e.get())
-        code += '{0} = {1}\n'.format(l_text, e_text)
+        else:
+            e_text = set_var_to_type(e.get())
+            if isinstance(e_text, str):
+                e_text = '\'{0}\''.format(e_text)
+            code += '{0} = {1}\n'.format(l_text, e_text)
         offset += 1
     code += '{0}('.format(func_name)
     for l in labels:

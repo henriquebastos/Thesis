@@ -17,6 +17,8 @@ while i < 3:
    a = f(a, b, 0, 0) + g()
    i += 1
 
+print qart
+
 print a
 print 2
 
