@@ -587,7 +587,10 @@ def display_func_output(event, executed_box, func_lineno, func_lines, selected_c
                     executed_line = '{0}={1}'.format(variable, value)
                 else:
                     executed_line += ',{0}={1}'.format(variable, value)
-        executed_output += '{0}\n'.format(executed_line)
+        if executed_line is None:
+            executed_output += '\n'
+        else:
+            executed_output += '{0}\n'.format(executed_line)
     executed_box.insert(INSERT, executed_output)
     executed_box.config(state=DISABLED)
 
@@ -708,7 +711,10 @@ def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
                         prev_scope = scope
                         # tabs += 1
                     # executed_line = '{0}{1}'.format(tabs * '  ', executed_line)
-                    executed_lines += '{0}: {1}\n'.format(values['lineno'], executed_line)
+                    if executed_line is None:
+                        executed_lines += '{0}:\n'.format(values['lineno'])
+                    else:
+                        executed_lines += '{0}: {1}\n'.format(values['lineno'], executed_line)
                     # executed_box.insert('{0}.end'.format(values['lineno']), '{0}    '.format(executed_line))
             executed_box.insert(INSERT, executed_lines)
         else:
@@ -837,7 +843,10 @@ def test_function_call(toplevel, executed_box, code, func_lineno, func_name,
                             executed_line = '{0}={1}'.format(variable, value)
                         else:
                             executed_line += ',{0}={1}'.format(variable, value)
-                executed_output += '{0}\n'.format(executed_line)
+                if executed_line is None:
+                    executed_output += '\n'
+                else:
+                    executed_output += '{0}\n'.format(executed_line)
                 call_no += 1
             executed_box.insert(INSERT, executed_output)
         else:
