@@ -370,6 +370,9 @@ def display_executed_code(executed_code, code_box,
         display_line = ''
         if total >= 0 and start <= 0:
             if 'result' in value:
+                if '***' in value['result']:
+                    code_box.tag_add('ERROR_HIGHLIGHT', '{0}.0'.format(value['lineno']),
+                                     '{0}.end'.format(value['lineno']))
                 if 'assigned' in value:
                     handle_assignment_in_executed_code(value, key)
                 if 'print' in value:
@@ -709,6 +712,9 @@ def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
                     scope = functionThread.get_scope(values['lineno'])
                     if scope != prev_scope:
                         prev_scope = scope
+                    func_name = functionThread.new_function(values['lineno'])
+                    if func_name is not None:
+                        executed_lines += '\n{0}\n'.format(func_name)
                         # tabs += 1
                     # executed_line = '{0}{1}'.format(tabs * '  ', executed_line)
                     if executed_line is None:
@@ -752,6 +758,12 @@ class TestFunctionThread(threading.Thread):
             return self.data[lineno]['name']
         return 'global'
 
+    def new_function(self, lineno):
+        if 'function_lines' in self.data:
+            for func, lines in self.data['function_lines'].iteritems():
+                if lines[0] == lineno:
+                    return func
+        return None
 
     def correct_mangled_variables(self):
         for call, evaluated in self.executed_code.iteritems():
@@ -1271,11 +1283,12 @@ def correct_mangled_variables():
 
 
 class CommunicationThread(threading.Thread):
-    def __init__(self, filename, variable_box):
+    def __init__(self, filename, variable_box, code_box):
         threading.Thread.__init__(self)
         self.filename = filename
         self.stop_event = threading.Event()
         self.variable_box = variable_box
+        self.code_box = code_box
 
     def run(self):
         global executed_code
@@ -1300,7 +1313,6 @@ class CommunicationThread(threading.Thread):
                 reset_objects()
                 successful_exit = True
         except Exception as e:
-            print 'ERROR ERROR ERROR'
             self.variable_box.config(state=NORMAL)
             self.variable_box.delete(0.0, END)
             self.variable_box.insert(INSERT, self.get_error_message(traceback.format_exc()))
@@ -1317,7 +1329,10 @@ class CommunicationThread(threading.Thread):
         for line in traceback_message.split('\n'):
             if 'File \"<unknown>\", line' in line:
                 add_lines = True
-                line = 'Line: {0}'.format(line.lstrip('File \"<unknown>\", '))
+                lineno = line.lstrip('File \"<unknown>\", ')
+                line = 'Line: {0}'.format(lineno)
+                self.code_box.tag_add('ERROR_HIGHLIGHT', '{0}.0'.format(lineno),
+                                      '{0}.end'.format(lineno))
             if add_lines:
                 error_message += '{0}\n'.format(line)
         return error_message
@@ -1372,6 +1387,7 @@ def reset_tags(code_box):
     code_box.tag_configure('Token.Literal.String.Single', foreground='yellow')
     code_box.tag_configure('Token.Name.Builtin.Pseudo', foreground='orange')
     code_box.tag_configure('HIGHLIGHT', background='gray5')
+    code_box.tag_configure('ERROR_HIGHLIGHT', background='red4')
 
 
 def run_user_code(code_box, new_user_code, variable_box):
@@ -1386,7 +1402,7 @@ def run_user_code(code_box, new_user_code, variable_box):
             with open(FILE_NAME, "w") as code_file:
                 code_file.write(user_code)
                 code_file.close()
-            communicationThread = CommunicationThread(FILE_NAME, variable_box)
+            communicationThread = CommunicationThread(FILE_NAME, variable_box, code_box)
             communicationThread.start()
     except:
         pass
@@ -1632,7 +1648,7 @@ class Application(Frame):
         # Center Frame
         variable_title = Label(variable_frame, text='Variables')
         variable_title.pack(side=TOP, fill=X)
-        variable_box = Text(variable_frame)
+        variable_box = Text(variable_frame, wrap=NONE)
         variable_box.tag_configure("BOLD", font=('-weight bold'))
         variable_box.pack(side=TOP)
 
@@ -1649,7 +1665,7 @@ class Application(Frame):
         # Right Frame
         input_title = Label(input_frame, text='Input')
         input_title.pack(side=TOP, fill=X)
-        input_box = Text(input_frame)
+        input_box = Text(input_frame, wrap=NONE)
         input_box.pack(side=TOP, fill=Y)
         if os.path.isfile(INPUT_FILE_NAME):
             with open(INPUT_FILE_NAME, 'r') as input_file:
@@ -1661,7 +1677,7 @@ class Application(Frame):
 
         output_title = Label(output_frame, text='Output')
         output_title.pack(side=TOP, fill=X)
-        output_box = Text(output_frame)
+        output_box = Text(output_frame, wrap=NONE)
         output_box.pack(side=TOP, fill=Y)
 
         root.after(500, main_loop, paired_text_boxes, lineno_box,
