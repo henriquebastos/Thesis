@@ -715,13 +715,10 @@ def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
                     func_name = functionThread.new_function(values['lineno'])
                     if func_name is not None:
                         executed_lines += '\n{0}\n'.format(func_name)
-                        # tabs += 1
-                    # executed_line = '{0}{1}'.format(tabs * '  ', executed_line)
                     if executed_line is None:
                         executed_lines += '{0}:\n'.format(values['lineno'])
                     else:
                         executed_lines += '{0}: {1}\n'.format(values['lineno'], executed_line)
-                    # executed_box.insert('{0}.end'.format(values['lineno']), '{0}    '.format(executed_line))
             executed_box.insert(INSERT, executed_lines)
         else:
             executed_box.insert(INSERT, 'There was an error with your code. Please try again or modify your input\n')
