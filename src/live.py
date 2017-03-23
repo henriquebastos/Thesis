@@ -1453,11 +1453,14 @@ def display_user_code(code_box, variable_box, output_box, start_scale, scale,
 def set_line_numbers(lineno_box, line_count):
     lineno_box.config(state=NORMAL)
     lineno = len(lineno_box.get(0.0, END)[:-1].split('\n'))
-    if lineno < line_count:
+
+    if lineno <= line_count:
         while lineno < line_count:
+            lineno_box.delete('{0}.0'.format(lineno), '{0}.end'.format(lineno))
             lineno_box.insert(INSERT, '{0}\n'.format(lineno))
             lineno += 1
-        lineno_box.insert(INSERT, '{0}'.format(lineno))
+            lineno_box.delete('{0}.0'.format(lineno), '{0}.end'.format(lineno))
+        lineno_box.insert(INSERT, '{0}\n'.format(lineno))
     else:
         while lineno > line_count:
             lineno_box.delete('{0}.0'.format(lineno), 'end')
@@ -1687,4 +1690,4 @@ class Application(Frame):
 
 app = Application(master=root)
 app.mainloop()
-root.destroy()
+# root.destroy()
