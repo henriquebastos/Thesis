@@ -46,6 +46,14 @@ for i in [1,2,3,4]:
 for i in a4:
    print i
 
+xyz = {}
+for i in a4:
+   xyz[i] = i
+
+for (a,b) in xyz.iteritems():
+   print a
+   print b
+
 class Node():
    def __init__(self):
       self.value = None
@@ -142,4 +150,3 @@ print user_input
 print user_input + 1
 user_input2 = input()
 print user_input2
-

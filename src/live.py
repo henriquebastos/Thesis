@@ -1452,12 +1452,16 @@ def display_user_code(code_box, variable_box, output_box, start_scale, scale,
 
 def set_line_numbers(lineno_box, line_count):
     lineno_box.config(state=NORMAL)
-    lineno_box.delete(0.0, END)
-    lineno = 1
-    while lineno < line_count:
-        lineno_box.insert(INSERT, '{0}\n'.format(lineno))
-        lineno += 1
-    lineno_box.insert(INSERT, '{0}'.format(lineno))
+    lineno = len(lineno_box.get(0.0, END)[:-1].split('\n'))
+    if lineno < line_count:
+        while lineno < line_count:
+            lineno_box.insert(INSERT, '{0}\n'.format(lineno))
+            lineno += 1
+        lineno_box.insert(INSERT, '{0}'.format(lineno))
+    else:
+        while lineno > line_count:
+            lineno_box.delete('{0}.0'.format(lineno), 'end')
+            lineno -= 1
     lineno_box.config(state=DISABLED)
 
 
@@ -1479,28 +1483,21 @@ def main_loop(scrolled_text_pair, lineno_box, from_box, input_box, variable_box,
 
         if user_code != new_user_code:
             scroll_position = scrolled_text_pair.scrollbar.get()
-            scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
+            scrolled_text_pair.left.configure(yscrollcommand=None, state=NORMAL)
             set_line_numbers(lineno_box, len(new_user_code.split('\n')))
             run_user_code(from_box, new_user_code, variable_box)
         elif (scale.get() != prev_scale_setting or 
                 start_scale.get() != prev_start_scale_setting):
-            # scroll_position = scrolled_text_pair.scrollbar.get()
-            # scrolled_text_pair.right.configure(yscrollcommand=None, state=NORMAL)
             on_scale_change(from_box, variable_box, output_box, start_scale,
                             scale, tree_wrapper, tree_viewer, combobox)
-            # if scroll_position is not None:
-            #     scrolled_text_pair.right.configure(
-            #         yscrollcommand=scrolled_text_pair.on_textscroll)
-            #     scrolled_text_pair.right.yview('moveto', scroll_position[0])
-            #     scroll_position = None
 
         if communicationThread is not None and not communicationThread.isAlive():
             display_user_code(from_box, variable_box, output_box, start_scale,
                               scale, tree_wrapper, tree_viewer, combobox)
             if scroll_position is not None:
-                scrolled_text_pair.right.configure(
+                scrolled_text_pair.left.configure(
                     yscrollcommand=scrolled_text_pair.on_textscroll)
-                scrolled_text_pair.right.yview('moveto', scroll_position[0])
+                scrolled_text_pair.left.yview('moveto', scroll_position[0])
                 scroll_position = None
 
         # Check for new input
