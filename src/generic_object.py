@@ -32,14 +32,16 @@ class GenericObject:
 
     def add_variable(self, variable, result, class_name=None, simple_id=None):
         if '.' in variable:
-            variable = variable.split('.')[1]
-        if 'self.' in result:
-            result = result.split('self.')[1]
-        if '.' in result:
-            new_result = ''
-            for r in result.split('.')[1:-1]:
-                new_result = r + '.'
-            result = new_result + result.split('.')[-1]
+            variable = variable.split('.')[-1]
+        # if 'self.' in result:
+        #     result = result.split('self.')[1]
+        # if '.' in result:
+        #     new_result = ''
+        #     for r in result.split('.')[1:-1]:
+        #         new_result = r + '.'
+        #     result = new_result + result.split('.')[-1]
+        if '=' in result and '.' in result:
+            result = '{0}={1}'.format(result.split('=')[0].split('.')[-1], result.split('=')[1])
         if class_name is None and simple_id is None:
             self.variables[variable] = result
         else:

@@ -212,10 +212,11 @@ def check_add_to_object(scope, variable, result, lineno):
     global current_object_lines
     global current_generic_object
     global current_function
-
     if lineno in current_object_lines:
         if 'self.' in variable:
             if 'instance at' in result and '.' in result:
+                if lineno == 33:
+                    print '3'
                 class_name = result.split('=')[1].split(' instance')[0].split('.')[1]
                 instance_id = result.split(' instance at ')[1].split('>')[0]
                 obj = get_object(instance_id)
@@ -1536,8 +1537,10 @@ class ScrolledTextPair(Frame):
         # if 'width' not in kwargs:
         #     kwargs['width'] = 30
         # Creating the widgets
-        self.left = Text(self, foreground='gray', background='gray15', height=55, width=3, wrap=NONE)
-        self.right = Text(self, foreground='white', background='gray15', height=55, wrap=NONE)
+        self.left = Text(self, foreground='gray', background='gray15',
+                         height=55, width=3, wrap=NONE)
+        self.right = Text(self, foreground='white', background='gray15',
+                          insertbackground='white', height=55, wrap=NONE)
         if os.path.isfile(FILE_NAME):
             with open(FILE_NAME, 'r') as code_file:
                 lines = code_file.readlines()
