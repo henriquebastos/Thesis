@@ -756,7 +756,7 @@ class WalkAST(ast.NodeVisitor):
         print '<'
         self.line += '<'
 
-    def visit_Lte(self, node):
+    def visit_LtE(self, node):
         print '<='
         self.line += '<='
 
@@ -764,7 +764,7 @@ class WalkAST(ast.NodeVisitor):
         print '>'
         self.line += '>'
 
-    def visit_Gte(self, node):
+    def visit_GtE(self, node):
         print '>='
         self.line += '>='
 
