@@ -215,8 +215,6 @@ def check_add_to_object(scope, variable, result, lineno):
     if lineno in current_object_lines:
         if 'self.' in variable:
             if 'instance at' in result and '.' in result:
-                if lineno == 33:
-                    print '3'
                 class_name = result.split('=')[1].split(' instance')[0].split('.')[1]
                 instance_id = result.split(' instance at ')[1].split('>')[0]
                 obj = get_object(instance_id)
@@ -1454,15 +1452,14 @@ def display_user_code(code_box, variable_box, output_box, start_scale, scale,
 def set_line_numbers(lineno_box, line_count):
     lineno_box.config(state=NORMAL)
     lineno = len(lineno_box.get(0.0, END)[:-1].split('\n'))
-
-    if lineno <= line_count:
+    if lineno < line_count:
         while lineno < line_count:
             lineno_box.delete('{0}.0'.format(lineno), '{0}.end'.format(lineno))
             lineno_box.insert(INSERT, '{0}\n'.format(lineno))
             lineno += 1
             lineno_box.delete('{0}.0'.format(lineno), '{0}.end'.format(lineno))
         lineno_box.insert(INSERT, '{0}\n'.format(lineno))
-    else:
+    elif lineno > line_count:
         while lineno > line_count:
             lineno_box.delete('{0}.0'.format(lineno), 'end')
             lineno -= 1
