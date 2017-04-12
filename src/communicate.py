@@ -142,9 +142,13 @@ class Communicator(object):
                     if data[previous_lineno]['type'] == 'loop':
                         self.evaluate_loop_after(data, previous_lineno)
                     else:
-                        self.should_execute_previous = False
-                        self.call += 1
-                        self.evaluate_expressions(data, previous_lineno)
+                        if data[previous_lineno]['type'] != 'func':
+                            self.should_execute_previous = False
+                            self.call += 1
+                            self.evaluate_expressions(data, previous_lineno)
+                        else:
+                            self.should_execute_previous = False
+                            self.call += 1
             if 'type' in data[lineno]:
                 if data[lineno]['type'] == 'assign':
                     self.evaluate_assign(data, lineno)
@@ -166,7 +170,7 @@ class Communicator(object):
                     self.evaluate_return(data, lineno)
             else:
                 result = self.evaluate_expressions(data, lineno)
-                if '\n' in result:
+                if result is not None and '\n' in result:
                     result = result.split('\n')[-1]
                 self.executed_code[self.call]['result'] = result
                 self.call += 1
@@ -255,7 +259,10 @@ class Communicator(object):
 
     def evaluate_print(self, data, lineno):
         result = self.evaluate_expressions(data, lineno)
-        self.executed_code[self.call]['result'] = result
+        if 'expressions' in data[lineno] and len(data[lineno]['expressions']) == 0:
+            self.executed_code[self.call]['result'] = '\n'
+        else:
+            self.executed_code[self.call]['result'] = result
         self.executed_code[self.call]['print'] = True
         self.call += 1
 
@@ -316,7 +323,8 @@ class Communicator(object):
     def evaluate_targets(self, data, lineno):
         if 'targets' in data[lineno]:
             self.setup_executed_code(lineno)
-            self.evaluate(data[lineno]['targets'], True)
+            return self.evaluate(data[lineno]['targets'], True)
+        return None
 
     def is_class(self, item):
         if 'classes' in self.data and item is not None:

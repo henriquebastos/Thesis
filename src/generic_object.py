@@ -52,11 +52,14 @@ class GenericObject:
         if function not in self.functions:
             self.functions.append(function)
 
-    def add_function_variable(self, function, variable, result):
+    def add_function_variable(self, function, variable, result, class_name=None, simple_id=None):
         self.add_function(function)
         if function not in self.function_variables:
             self.function_variables[function] = {}
-        self.function_variables[function][variable] = result
+        if class_name is None and simple_id is None:
+            self.function_variables[function][variable] = '{0}={1}'.format(variable, result)
+        else:
+            self.function_variables[function][variable] = '{0}={1}_{2}'.format(variable, class_name, simple_id)
 
     def get_variable(self, variable):
         if variable in self.object_variables:

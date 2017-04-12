@@ -208,7 +208,7 @@ def check_for_new_object(scope, variable, result):
     return False
 
 
-def check_add_to_object(scope, variable, result, lineno):
+def check_add_to_object(scope, variable, result, lineno, value):
     global current_object_lines
     global current_generic_object
     global current_function
@@ -223,7 +223,24 @@ def check_add_to_object(scope, variable, result, lineno):
             else:
                 current_generic_object.add_variable(variable, result)
         elif current_function is not None:
-            current_generic_object.add_function_variable(current_function, variable, result)
+            if 'instance at' in result and '.' in result:
+                class_name = result.split('=')[1].split(' instance')[0].split('.')[1]
+                instance_id = result.split(' instance at ')[1].split('>')[0]
+                obj = get_object(instance_id)
+                simple_id = obj.simple_id
+                current_generic_object.add_function_variable(current_function, variable, result, class_name, simple_id)
+            else:
+                current_generic_object.add_function_variable(current_function, variable, result)
+    elif 'self.' in variable and current_generic_object is not None and 'instance at' in result and '.' in result:
+        if 'assigned_values' in value and 'self' in value['assigned_values']:
+            parent_instance_id = value['assigned_values']['self'].split(' instance at ')[1].split('>')[0]
+            parent_obj = get_object(parent_instance_id)
+            if parent_obj is not None:
+                class_name = result.split('=')[1].split(' instance')[0].split('.')[1]
+                instance_id = result.split(' instance at ')[1].split('>')[0]
+                obj = get_object(instance_id)
+                simple_id = obj.simple_id
+                parent_obj.add_variable(variable, result, class_name, simple_id)
     else:
         current_generic_object = None
         current_function = None
@@ -276,7 +293,14 @@ def check_function_variables_arguments(lineno, values):
     if lineno in current_object_lines:
         for k,v in values.iteritems():
             if current_generic_object is not None and current_function is not None:
-                current_generic_object.add_function_variable(current_function, k, v)
+                if 'instance at' in v and '.' in v:
+                    class_name = v.split(' instance')[0].split('.')[1]
+                    instance_id = v.split(' instance at ')[1].split('>')[0]
+                    obj = get_object(instance_id)
+                    simple_id = obj.simple_id
+                    current_generic_object.add_function_variable(current_function, k, v, class_name, simple_id)
+                else:
+                    current_generic_object.add_function_variable(current_function, k, v)
 
 
 def handle_assignment_in_executed_code(value, call_num):
@@ -287,9 +311,10 @@ def handle_assignment_in_executed_code(value, call_num):
         result = value['result'].split('=')[1]
     else:
         result = ''
+
     if not check_for_new_object(scope, variable, result):
         check_add_to_object(scope, variable, value['result'],
-                            value['lineno'])
+                            value['lineno'], value)
     else:
         check_modify_object(variable, value['result'], value['lineno'])
     set_variable_value(scope, variable, result, call_num)
@@ -355,7 +380,20 @@ def handle_functions_in_executed_code(value, call_num):
             no_comma = False
         else:
             display_line += ', '
-        display_line += '{0}={1}'.format(k, v)
+        if 'instance at' in v and '.' in v:
+            class_name = v.split(' instance')[0].split('.')[1]
+            instance_id = v.split(' instance at ')[1].split('>')[0]
+            obj = get_object(instance_id)
+            display_line += '{0}={1}_{2}'.format(k, class_name, obj.simple_id)
+        else:
+            display_line += '{0}={1}'.format(k, v)
+
+        if not check_for_new_object(scope, k, v):
+            check_add_to_object(scope, k, '{0}={1}'.format(k, v),
+                                value['lineno'], value)
+        else:
+            check_modify_object(v, '{0}={1}'.format(k, v), value['lineno'])
+
         set_variable_value(scope, k, v, call_num)
     check_function_variables_arguments(value['lineno'], value['values'])
     return display_line
@@ -405,9 +443,10 @@ def get_functions():
 
 
 def display_tree(event, combobox, tree_viewer):
+    tree_viewer.clearTree()
     for obj in root_objects:
         if selected_object.get() in obj.generic_object.name:
-            tree_viewer.clearTree()
+            # tree_viewer.clearTree()
             obj.view()
     combobox.selection_clear()
 
@@ -676,6 +715,7 @@ def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
             # tabs = -1
             prev_scope = None
             simple_id = 0
+            instance_ids_to_simple_ids = {}
             executed_lines = ''
             for call_no, values in functionThread.executed_code.iteritems():
                 if int(values['lineno']) < line_length and int(values['lineno']) != 1:
@@ -690,8 +730,13 @@ def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
                             else:
                                 value = functionThread.executed_code[call_no]['result']
                             class_name = value.split(' instance')[0].split('.')[1]
-                            value = '{0}_{1}'.format(class_name, simple_id)
-                            simple_id += 1
+                            instance_id = value.split(' instance at ')[1].split('>')[0]
+                            if instance_id in instance_ids_to_simple_ids:
+                                value = '{0}_{1}'.format(class_name, instance_ids_to_simple_ids[instance_id])
+                            else:
+                                instance_ids_to_simple_ids[instance_id] = simple_id
+                                value = '{0}_{1}'.format(class_name, simple_id)
+                                simple_id += 1
                             if variable != '':
                                 executed_line = '{0}={1}'.format(variable, value)
                             else:
@@ -702,8 +747,13 @@ def test_class_call(toplevel, executed_box, code, class_lineno, class_lines,
                         for variable, value in functionThread.executed_code[call_no]['values'].iteritems():
                             if 'instance' in value and '.' in value:
                                 class_name = value.split(' instance')[0].split('.')[1]
-                                value = '{0}_{1}'.format(class_name, simple_id)
-                                simple_id += 1
+                                instance_id = value.split(' instance at ')[1].split('>')[0]
+                                if instance_id in instance_ids_to_simple_ids:
+                                    value = '{0}_{1}'.format(class_name, instance_ids_to_simple_ids[instance_id])
+                                else:
+                                    instance_ids_to_simple_ids[instance_id] = simple_id
+                                    value = '{0}_{1}'.format(class_name, simple_id)
+                                    simple_id += 1
                             if executed_line is None:
                                 executed_line = '{0}={1}'.format(variable, value)
                             else:
@@ -917,7 +967,7 @@ def tag_class(event, line):
                     entries.append(Entry(toplevel))
     class_lines.sort()
     code_box.config(height=len(class_lines)+2)
-    executed_box.config(height=len(class_lines)+2)
+    executed_box.config(height=len(class_lines)+2, state=DISABLED)
     code_output = ''
     code_box_lines = ''
     i = 1
@@ -986,7 +1036,7 @@ def tag_function_calls(event, line, call_points):
         #         func_lines = lines
         #         continue
     code_box.config(height=len(func_lines)+2)
-    executed_box.config(height=len(func_lines)+2)
+    executed_box.config(height=len(func_lines)+2, state=DISABLED)
     code_output = ''
     for l in func_lines:
         code_output += '{0}\n'.format(str(user_code.split('\n')[l-1]))
@@ -1063,7 +1113,13 @@ def simple_tag_function_calls(event, line, call_points):
             else:
                 call_line = 'Line: {1}'.format(index, lineno)
             for variable, value in executed_code[call]['values'].iteritems():
+                if 'instance at' in value and '.' in value:
+                    class_name = value.split(' instance')[0].split('.')[1]
+                    instance_id = value.split(' instance at ')[1].split('>')[0]
+                    obj = get_object(instance_id)
+                    value = '{0}_{1}'.format(class_name, obj.simple_id)
                 if ':' in call_line:
+                    
                     call_line += ', {0}={1}'.format(variable, value)
                 else:
                     call_line += ': {0}={1}'.format(variable, value)
