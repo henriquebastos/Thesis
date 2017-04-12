@@ -55,7 +55,7 @@ class WalkAST(ast.NodeVisitor):
 
     # Module(stmt* body)
     def visit_Module(self, node):
-        print 'Module'
+        # print 'Module'
         for stmt in node.body:
             walker = walk_ast(stmt, self.current_scope)
             utils.add_string_to_data(stmt.lineno, walker.data,
@@ -67,17 +67,17 @@ class WalkAST(ast.NodeVisitor):
 
     # Interactive(stmt* body)
     def visit_Interactive(self, node):
-        print 'Module Interactive'
+        # print 'Module Interactive'
         self.generic_visit(node)
 
     # Expression(expr body)
     def visit_Expression(self, node):
-        print 'Module Expr'
+        # print 'Module Expr'
         self.generic_visit(node)
 
     # Suite(stmt* body)
     def visit_Suite(self, node):
-        print 'Module Suite'
+        # print 'Module Suite'
         self.generic_visit(self, node)
 
     #
@@ -87,7 +87,7 @@ class WalkAST(ast.NodeVisitor):
     # FunctionDef(identifier name, arguments args,
     #             stmt* body, expr* decorator_list)
     def visit_FunctionDef(self, node):
-        print '{0}: FunctionDef - def {1}():'.format(node.lineno, node.name)
+        # print '{0}: FunctionDef - def {1}():'.format(node.lineno, node.name)
         utils.set_type(self.data, node.lineno, 'func')
         utils.set_name(self.data, node.lineno, node.name)
         utils.add_function_def(self.data, node.name, node.lineno)
@@ -112,7 +112,7 @@ class WalkAST(ast.NodeVisitor):
 
     # ClassDef(identifier name, expr* bases, stmt* body, expr* decorator_list)
     def visit_ClassDef(self, node):
-        print '{0}: ClassDef Name: {1}'.format(node.lineno, node.name)
+        # print '{0}: ClassDef Name: {1}'.format(node.lineno, node.name)
         utils.set_type(self.data, node.lineno, 'class')
         utils.set_name(self.data, node.lineno, node.name)
         utils.add_class(self.data, node.name)
@@ -134,13 +134,13 @@ class WalkAST(ast.NodeVisitor):
 
     # Return(expr? value)
     def visit_Return(self, node):
-        print '{0}: self.line +='.format(node.lineno)
+        # print '{0}: self.line +='.format(node.lineno)
         utils.set_type(self.data, node.lineno, 'return')
         if node.value is not None:
             walker = walk_ast_for_expr(node.value, self.current_scope)
-            print walker.data
-            print self.data
-            print walker.line
+            # print walker.data
+            # print self.data
+            # print walker.line
             utils.combine_data(node.lineno, self.data, walker.data)
             utils.add_string_to_data(node.lineno, self.data, walker.line)
             utils.combine_variable_scopes(self.variable_scope,
@@ -148,13 +148,13 @@ class WalkAST(ast.NodeVisitor):
 
     # Delete(expr* targets)
     def visit_Delete(self, node):
-        print '{0}: Delete'.format(node.lineno)
+        # print '{0}: Delete'.format(node.lineno)
         self.generic_visit(node)
         utils.set_type(self.data, node.lineno, 'delete')
 
     # Assign(expr* targets, expr value)
     def visit_Assign(self, node):
-        print '{0}: Assign'.format(node.lineno)
+        # print '{0}: Assign'.format(node.lineno)
         self.line = ''
         utils.set_type(self.data, node.lineno, 'assign')
         for target in node.targets:
@@ -177,7 +177,7 @@ class WalkAST(ast.NodeVisitor):
 
     # AugAssign(expr target, operator op, expr value)
     def visit_AugAssign(self, node):
-        print '{0}: AugAssign'.format(node.lineno)
+        # print '{0}: AugAssign'.format(node.lineno)
         target_walker = walk_ast_for_names(node.target, self.current_scope)
         utils.add_string_to_data(node.lineno, target_walker.data,
                                  target_walker.line)
@@ -202,8 +202,8 @@ class WalkAST(ast.NodeVisitor):
 
     # Print(expr? dest, expr* values, bool nl)
     def visit_Print(self, node):
-        print '{0}: Print'.format(node.lineno)
-        print 'Has New Line: {0}'.format(node.nl)
+        # print '{0}: Print'.format(node.lineno)
+        # print 'Has New Line: {0}'.format(node.nl)
         utils.set_type(self.data, node.lineno, 'print')
         for value in node.values:
             # walker = walk_ast_for_names(value)
@@ -216,7 +216,7 @@ class WalkAST(ast.NodeVisitor):
 
     # For(expr target, expr iter, stmt* body, stmt* orelse)
     def visit_For(self, node):
-        print '{0}: For'.format(node.lineno)
+        # print '{0}: For'.format(node.lineno)
         utils.add_loop_def(self.data, node.lineno)
         target_walker = walk_ast_for_names(node.target, self.current_scope)
         utils.add_string_to_data(node.lineno, target_walker.data,
@@ -244,7 +244,7 @@ class WalkAST(ast.NodeVisitor):
 
     # While(expr test, stmt* body, stmt* orelse)
     def visit_While(self, node):
-        print '{0}: While'.format(node.lineno)
+        # print '{0}: While'.format(node.lineno)
         utils.add_loop_def(self.data, node.lineno)
         test_walker = WalkAST(self.current_scope)
         test_walker.get_names = True
@@ -268,7 +268,7 @@ class WalkAST(ast.NodeVisitor):
 
     # If(expr test, stmt* body, stmt* orelse)
     def visit_If(self, node):
-        print '{0}: Stmt If'.format(node.lineno)
+        # print '{0}: Stmt If'.format(node.lineno)
         self.line = ''
         test_walker = walk_ast_for_expr(node.test, self.current_scope)
         utils.add_string_to_data(node.lineno, test_walker.data,
@@ -289,7 +289,7 @@ class WalkAST(ast.NodeVisitor):
 
     # With(expr context_expr, expr? optional_vars, stmt* body)
     def visit_With(self, node):
-        print '{0}: With'.format(node.lineno)
+        # print '{0}: With'.format(node.lineno)
         context_expr = walk_ast_for_expr(node.context_expr, self.current_scope)
         utils.add_string_to_data(node.lineno, context_expr.data,
                                  context_expr.line)
@@ -314,44 +314,44 @@ class WalkAST(ast.NodeVisitor):
 
     # Raise(expr? type, expr? inst, expr? tback)
     def visit_Raise(self, node):
-        print '{0}: Raise'.format(node.lineno)
+        # print '{0}: Raise'.format(node.lineno)
         self.generic_visit(node)
 
     # TryExcept(stmt* body, excepthandler* handlers, stmt* orelse)
     def visit_TryExcept(self, node):
-        print '{0}: TryExcept'.format(node.lineno)
+        # print '{0}: TryExcept'.format(node.lineno)
         self.generic_visit(node)
 
     # TryFinally(stmt* body, stmt* finalbody)
     def visit_TryFinally(self, node):
-        print '{0}: TryFinally'.format(node.lineno)
+        # print '{0}: TryFinally'.format(node.lineno)
         self.generic_visit(node)
 
     # Exec(expr body, expr? globals, expr? locals)
     def visit_Exec(self, node):
-        print '{0}: Exec'.format(node.lineno)
+        # print '{0}: Exec'.format(node.lineno)
         self.generic_visit(node)
 
     # Global(identifier* names)
     def visit_Global(self, node):
-        print '{0}: Globals'.format(node.lineno)
+        # print '{0}: Globals'.format(node.lineno)
         self.generic_visit(node)
 
     # Expr(expr value)
     def visit_Expr(self, node):
-        print '{0}: Expression'.format(node.lineno)
+        # print '{0}: Expression'.format(node.lineno)
         self.generic_visit(node)
 
     def visit_Pass(self, node):
-        print '{0}: Pass'.format(node.lineno)
+        # print '{0}: Pass'.format(node.lineno)
         self.generic_visit(node)
 
     def visit_Break(self, node):
-        print '{0}: Break'.format(node.lineno)
+        # print '{0}: Break'.format(node.lineno)
         self.generic_visit(node)
 
     def visit_Continue(self, node):
-        print '{0}: Continue'.format(node.lineno)
+        # print '{0}: Continue'.format(node.lineno)
         self.generic_visit(node)
 
     #
@@ -360,7 +360,7 @@ class WalkAST(ast.NodeVisitor):
 
     # BoolOp(boolop op, expr* values)
     def visit_BoolOp(self, node):
-        print '{0} BOOL_OP:'.format(node.lineno)
+        # print '{0} BOOL_OP:'.format(node.lineno)
         op_walker = walk_ast_for_expr(node.op, self.current_scope)
         utils.combine_variable_scopes(self.variable_scope,
                                       op_walker.variable_scope)
@@ -396,14 +396,14 @@ class WalkAST(ast.NodeVisitor):
 
     # UnaryOp(unaryop op, expr operand)
     def visit_UnaryOp(self, node):
-        print '{0}:'.format(node.lineno)
+        # print '{0}:'.format(node.lineno)
         op_walker = walk_ast(node.op, self.current_scope)
         utils.combine_variable_scopes(self.variable_scope,
                                       op_walker.variable_scope)
         expr_walker = walk_ast_for_expr(node.operand, self.current_scope)
         utils.combine_variable_scopes(self.variable_scope,
                                       expr_walker.variable_scope)
-        print '\t' + op_walker.line + ' ' + expr_walker.line
+        # print '\t' + op_walker.line + ' ' + expr_walker.line
         utils.add_string_to_data(node.lineno, expr_walker.data,
                                  expr_walker.line)
         utils.combine_data(node.lineno, self.data, expr_walker.data)
@@ -412,17 +412,17 @@ class WalkAST(ast.NodeVisitor):
 
     # Lambda(arguments args, expr body)
     def visit_Lambda(self, node):
-        print '{0}:'.format(node.lineno)
+        # print '{0}:'.format(node.lineno)
         self.generic_visit(node)
 
     # IfExp(expr test, expr body, expr orelse)
     def visit_IfExp(self, node):
-        print '{0}: If'.format(node.lineno)
+        # print '{0}: If'.format(node.lineno)
         self.generic_visit(node)
 
     # Dict(expr* keys, expr* values)
     def visit_Dict(self, node):
-        print '{0}: Dict'.format(node.lineno)
+        # print '{0}: Dict'.format(node.lineno)
         for value in node.values:
             walker = walk_ast_for_expr(value, self.current_scope)
             utils.add_string_to_data(node.lineno, walker.data, walker.line)
@@ -434,37 +434,37 @@ class WalkAST(ast.NodeVisitor):
 
     # Set(expr* elts)
     def visit_Set(self, node):
-        print '{0}: Set'.format(node.lineno)
+        # print '{0}: Set'.format(node.lineno)
         self.generic_visit(node)
 
     # ListComp(expr elt, comprehension* generators)
     def visit_ListComp(self, node):
-        print '{0}: List Comp'.format(node.lineno)
+        # print '{0}: List Comp'.format(node.lineno)
         self.generic_visit(node)
 
     # SetComp(expr elt, comprehension* generators)
     def visit_SetComp(self, node):
-        print '{0}: Set Comp'.format(node.lineno)
+        # print '{0}: Set Comp'.format(node.lineno)
         self.generic_visit(node)
 
     # DictComp(expr key, expr value, comprehension* generators)
     def visit_DictComp(self, node):
-        print '{0}: Dict Comp'.format(node.lineno)
+        # print '{0}: Dict Comp'.format(node.lineno)
         self.generic_visit(node)
 
     # GeneratorExp(expr elt, comprehension* generators)
     def visit_GeneratorExp(self, node):
-        print '{0}: Generator Expression'.format(node.lineno)
+        # print '{0}: Generator Expression'.format(node.lineno)
         self.generic_visit(node)
 
     # Yield(expr? value)
     def visit_Yield(self, node):
-        print '{0}: Yield'.format(node.lineno)
+        # print '{0}: Yield'.format(node.lineno)
         self.generic_visit(node)
 
     # Compare(expr left, cmpop* ops, expr* comparators)
     def visit_Compare(self, node):
-        print '{0}: Compare'.format(node.lineno)
+        # print '{0}: Compare'.format(node.lineno)
         left_walker = walk_ast_for_names(node.left, self.current_scope)
         utils.add_string_to_data(node.lineno, left_walker.data,
                                  left_walker.line)
@@ -488,7 +488,7 @@ class WalkAST(ast.NodeVisitor):
     # Call(expr func, expr* args, keyword* keywords,
     #      expr? starargs, expr? kwargs)
     def visit_Call(self, node):
-        print '{0}: Call'.format(node.lineno)
+        # print '{0}: Call'.format(node.lineno)
         func_walker = walk_ast_for_names(node.func, self.current_scope)
         if not isinstance(node.func, ast.Name):
             utils.combine_data(node.lineno, self.data, func_walker.data)
@@ -513,23 +513,23 @@ class WalkAST(ast.NodeVisitor):
 
     # Repr(expr value)
     def visit_Repr(self, node):
-        print '{0}: Repr'.format(node.lineno)
+        # print '{0}: Repr'.format(node.lineno)
         self.generic_visit(node)
 
     # Num(object n) -- a number as a PyObject.
     def visit_Num(self, node):
-        print '{0}: Num: {1}'.format(node.lineno, node.n)
+        # print '{0}: Num: {1}'.format(node.lineno, node.n)
         if self.is_bin_op:
             self.line += str(node.n)
 
     # Str(string s) -- need to specify raw, unicode, etc?
     def visit_Str(self, node):
-        print '{0}: String: {1}'.format(node.lineno, node.s)
+        # print '{0}: String: {1}'.format(node.lineno, node.s)
         self.line += '\'' + node.s + '\''
 
     # Attribute(expr value, identifier attr, expr_context ctx)
     def visit_Attribute(self, node):
-        print '{0}: Attribute attr: {1}'.format(node.lineno, node.attr)
+        # print '{0}: Attribute attr: {1}'.format(node.lineno, node.attr)
         walker = walk_ast_for_expr(node.value, self.current_scope)
         utils.combine_data(node.lineno, self.data, walker.data)
         utils.combine_variable_scopes(self.variable_scope,
@@ -541,7 +541,7 @@ class WalkAST(ast.NodeVisitor):
 
     # Subscript(expr value, slice slice, expr_context ctx)
     def visit_Subscript(self, node):
-        print '{0}: Subscript'.format(node.lineno)
+        # print '{0}: Subscript'.format(node.lineno)
         value_walker = walk_ast_for_names(node.value, self.current_scope)
         utils.add_string_to_data(node.lineno, value_walker.data,
                                  value_walker.line)
@@ -561,7 +561,7 @@ class WalkAST(ast.NodeVisitor):
 
     # Name(identifier id, expr_context ctx)
     def visit_Name(self, node):
-        print '{0}: Name id: {1}'.format(node.lineno, node.id)
+        # print '{0}: Name id: {1}'.format(node.lineno, node.id)
         if (self.is_bin_op and isinstance(node.ctx, ast.Load)) or \
                 self.get_names:
             utils.add_string_to_data(node.lineno, self.data, node.id)
@@ -575,7 +575,7 @@ class WalkAST(ast.NodeVisitor):
 
     # List(expr* elts, expr_context ctx)
     def visit_List(self, node):
-        print '{0}: List'.format(node.lineno)
+        # print '{0}: List'.format(node.lineno)
         if len(node.elts) == 0:
             utils.setup_expressions(self.data, node.lineno)
             self.line += '[]'
@@ -590,14 +590,14 @@ class WalkAST(ast.NodeVisitor):
                                               walker.variable_scope)
                 # utils.add_string_to_data(node.lineno, self.data, self.line)
         self.generic_visit(node.ctx)
-        print self.data[node.lineno]['expressions']
+        # print self.data[node.lineno]['expressions']
         self.data[node.lineno]['type'] = 'list_assign'
         utils.remove_empty_string(self.data, node.lineno)
         # self.generic_visit(node)
 
     # Tuple(expr* elts, expr_context ctx)
     def visit_Tuple(self, node):
-        print '{0}: Tuple'.format(node.lineno)
+        # print '{0}: Tuple'.format(node.lineno)
         for elt in node.elts:
             walker = walk_ast_for_names(elt, self.current_scope)
             utils.add_string_to_data(node.lineno, walker.data, walker.line)
@@ -610,27 +610,27 @@ class WalkAST(ast.NodeVisitor):
     # expr_context
     #
     def visit_Load(self, node):
-        print 'Load'
+        # print 'Load'
         self.line += ''
 
     def visit_Store(self, node):
-        print 'Store'
+        # print 'Store'
         self.line += ''
 
     def visit_Del(self, node):
-        print 'Del'
+        # print 'Del'
         self.line += ''
 
     def visit_AugLoad(self, node):
-        print 'AugLoad'
+        # print 'AugLoad'
         self.line += ''
 
     def visit_AugStore(self, node):
-        print 'AugStore'
+        # print 'AugStore'
         self.line += ''
 
     def visit_Param(self, node):
-        print 'Param'
+        # print 'Param'
         self.line += ''
 
     #
@@ -639,21 +639,22 @@ class WalkAST(ast.NodeVisitor):
 
     # Ellipsis
     def visit_Ellipsis(self, node):
-        print 'Ellipsis'
+        pass
+        # print 'Ellipsis'
 
     # Slice(expr? lower, expr? upper, expr? step)
     def visit_Slice(self, node):
-        print 'Slice'
+        # print 'Slice'
         self.generic_visit(node)
 
     # ExtSlice(slice* dims)
     def visit_ExtSlice(self, node):
-        print 'ExtSlice'
+        # print 'ExtSlice'
         self.generic_visit(node)
 
     # Index(expr value)
     def visit_Index(self, node):
-        print 'Index'
+        # print 'Index'
         walker = walk_ast_for_expr(node.value, self.current_scope)
         self.line = walker.line
         utils.add_string_to_data(self.lineno, walker.data, walker.line)
@@ -665,140 +666,141 @@ class WalkAST(ast.NodeVisitor):
     # boolop
     #
     def visit_And(self, node):
-        print 'and'
+        # print 'and'
         self.line += 'and'
 
     def visit_Or(self, node):
-        print 'or'
+        # print 'or'
         self.line += 'or'
 
     #
     # operator
     #
     def visit_Add(self, node):
-        print '+'
+        # print '+'
         self.line += '+'
 
     def visit_Sub(self, node):
-        print '-'
+        # print '-'
         self.line += '-'
 
     def visit_Mult(self, node):
-        print '*'
+        # print '*'
         self.line += '*'
 
     def visit_Div(self, node):
-        print '/'
+        # print '/'
         self.line += '/'
 
     def visit_Mod(self, node):
-        print '%'
+        # print '%'
         self.line += '%'
 
     def visit_Pow(self, node):
-        print '**'
+        # print '**'
         self.line += '**'
 
     def visit_LShift(self, node):
-        print '<<'
+        # print '<<'
         self.line += '<<'
 
     def visit_RShift(self, node):
-        print '>>'
+        # print '>>'
         self.line += '>>'
 
     def visit_BitOr(self, node):
-        print '|'
+        # print '|'
         self.line += '|'
 
     def visit_BitXor(self, node):
-        print '^'
+        # print '^'
         self.line += '^'
 
     def visit_BitAnd(self, node):
-        print '&'
+        # print '&'
         self.line += '&'
 
     def visit_FloorDiv(self, node):
-        print 'FLOOR DIV'
+        pass
+        # print 'FLOOR DIV'
 
     #
     # unaryop
     #
     def visit_Invert(self, node):
-        print '~'
+        # print '~'
         self.line += '~'
 
     def visit_Not(self, node):
-        print 'not'
+        # print 'not'
         self.line += 'not'
 
     def visit_UAdd(self, node):
-        print '+'
+        # print '+'
         self.line += '+'
 
     def visit_USub(self, node):
-        print '-'
+        # print '-'
         self.line += '-'
 
     #
     # cmpop
     #
     def visit_Eq(self, node):
-        print '=='
+        # print '=='
         self.line += '=='
 
     def visit_NotEq(self, node):
-        print '!='
+        # print '!='
         self.line += '!='
 
     def visit_Lt(self, node):
-        print '<'
+        # print '<'
         self.line += '<'
 
     def visit_LtE(self, node):
-        print '<='
+        # print '<='
         self.line += '<='
 
     def visit_Gt(self, node):
-        print '>'
+        # print '>'
         self.line += '>'
 
     def visit_GtE(self, node):
-        print '>='
+        # print '>='
         self.line += '>='
 
     def visit_Is(self, node):
-        print 'is'
+        # print 'is'
         self.line += 'is'
 
     def visit_IsNot(self, node):
-        print 'is not'
+        # print 'is not'
         self.line += 'is not'
 
     def visit_In(self, node):
-        print 'in'
+        # print 'in'
         self.line += 'in'
 
     def visit_NotIn(self, node):
-        print 'not in'
+        # print 'not in'
         self.line += 'not in'
 
     # comprehension = (expr target, expr iter, expr* ifs)
     def visit_comprehension(self, node):
-        print 'Comprehension'
+        # print 'Comprehension'
         self.generic_visit(node)
 
     # excepthandler = ExceptHandler(expr? type, expr? name, stmt* body)
     #                           attributes (int lineno, int col_offset)
     def visit_ExceptHandler(self, node):
-        print 'ExceptHandler'
+        # print 'ExceptHandler'
         self.generic_visit(node)
 
     # arguments = (expr* args, identifier? vararg,
     #              identifier? kwarg, expr* defaults)
     def visit_arguments(self, node):
-        print '{0}: Arguments'.format(self.lineno)
+        # print '{0}: Arguments'.format(self.lineno)
         if len(node.args) == 0:
             utils.setup_expressions(self.data, self.lineno)
         else:
@@ -817,12 +819,12 @@ class WalkAST(ast.NodeVisitor):
 
     # keyword = (identifier arg, expr value)
     def visit_keyword(self, node):
-        print 'KEY_WORD'
+        # print 'KEY_WORD'
         self.generic_visit(node)
 
     # alias = (identifier name, identifier? asname)
     def visit_alias(self, node):
-        print 'ALIAS'
+        # print 'ALIAS'
         self.generic_visit(node)
 
 

@@ -17,6 +17,13 @@ import generic_object as GenericObject
 import treeview
 from treeview_wrappers import TreeWrapper, TreeViewer
 
+# Distribution:
+# Mac via py2app:
+# rm -rf build dist
+# python setup.py py2app --includes pygments --packages pygments.lexers
+# Open or ./dist/live.app/Contents/MacOS/live (terminal)
+
+
 # RENAME to Environment
 
 name = 'Live Programming Environment'
@@ -914,7 +921,6 @@ def test_function_call(toplevel, executed_box, code, func_lineno, func_name,
 
 def add_class_function(event, widget, code_box, executed_box, label, combobox,
                        selected, labels, entries, r):
-    print selected.get()
     labels.append(Label(widget, text='{0}:'.format(selected.get())))
     entries.append(Entry(widget))
     entries[-1].insert(INSERT, '__NULL__')
