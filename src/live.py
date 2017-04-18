@@ -97,6 +97,14 @@ def get_loop_iteration_calls(lineno, lines):
     return calls, count
 
 
+# def get_lineno_scope(lineno):
+#     if 'function_lines' in data:
+#         for func, lines in data['function_lines'].iteritems():
+#             if lineno in lines:
+#                 return func
+#     return 'global'
+
+
 def display_variables(variable_box, call_num):
     global variable_scope
     global variable_values
@@ -130,7 +138,11 @@ def display_variables(variable_box, call_num):
             func_lines = data['function_lines'][func]
         variables_line = ''
         for variable in variables:
-            if variable_declared_in_scope(variable, func, func_lines):
+            # lineno = executed_code[call_num]['lineno']
+            # scope = get_lineno_scope(lineno)
+            # if 'function_lines' in data and func in data['function_lines']:
+            #     scope_lines = data['function_lines'][func]
+            if variable_declared_in_scope(variable, func, func_lines): # and (func == 'global' or lineno in func_lines):
                 if (call_num in variable_values_per_line and
                         func in variable_values_per_line[call_num] and
                         variable in variable_values_per_line[call_num][func] and
@@ -145,7 +157,7 @@ def display_variables(variable_box, call_num):
                         if func not in variable_values:
                             variable_values[func] = {}
                         variable_values[func][variable] = result
-                elif (func in variable_values and 
+                elif (func in variable_values and # func == 'global' and
                         variable in variable_values[func]):
                     variables_line += '{0}={1}\n'.format(
                         variable, variable_values[func][variable])
@@ -1581,6 +1593,8 @@ def main_loop(scrolled_text_pair, lineno_box, from_box, input_box, variable_box,
         if communicationThread is None and rerun_event.isSet():
             rerun_event.clear()
             user_code = ''
+
+    # print communicationThread
 
     root.after(10, main_loop, scrolled_text_pair, lineno_box, from_box,
                input_box, variable_box, output_box, start_scale, scale,

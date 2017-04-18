@@ -24,11 +24,6 @@ def has_no_keywords(arg):
             return False
     return True
 
-def receive_signal(signum, stack):
-    os.close(sys.stdin.fileno())
-    os.close(sys.stdout.fileno())
-
-signal.signal(signal.SIGUSR1, receive_signal)
 
 class Restart(Exception):
     """Causes a debugger to be restarted for the debugged python program."""

@@ -78,11 +78,7 @@ class Communicator(object):
             os.write(fd_write_2, 's\n')
             # Terminate on long loops
             if self.call > 1000 or self.stop_event.isSet():
-                os.kill(pid, signal.SIGUSR1)
-                os.kill(pid2, signal.SIGUSR1)
                 return
-        os.kill(pid, signal.SIGUSR1)
-        os.kill(pid2, signal.SIGUSR1)
 
     def in_correct_scope(self, scope, lineno):
         if scope == 'global' and 'function_lines' not in self.data:
@@ -131,7 +127,7 @@ class Communicator(object):
         return int(lineno)
 
     def evaluate_line(self, data, lineno):
-        if ('type' in data[lineno] and data[lineno]['type'] == 'func' and
+        if ('type' in data[lineno] and (data[lineno]['type'] == 'func' or data[lineno]['type'] == 'class') and
                 'declared' not in data[lineno]):
             data[lineno]['declared'] = True
         else:
@@ -235,12 +231,13 @@ class Communicator(object):
     def evaluate_list_assign(self, data, lineno):
         result = self.evaluate_and_store_expressions(data, lineno)
         assigned = None
-        for a in data[lineno]['assigned']:
-            if assigned is None:
-                assigned = a
-            else:
-                assigned += ',' + a
-        if result is not None:
+        if 'assigned' in data[lineno]:
+            for a in data[lineno]['assigned']:
+                if assigned is None:
+                    assigned = a
+                else:
+                    assigned += ',' + a
+        if result is not None and assigned is not None:
             self.executed_code[self.call]['result'] = assigned + '=' + result
         self.executed_code[self.call]['assigned'] = True
         self.call += 1
@@ -376,7 +373,7 @@ class Communicator(object):
 def launch_child(fd_write, fd_read, file):
     os.dup2(fd_read, sys.stdin.fileno())
     os.dup2(fd_write, sys.stdout.fileno())
-    os.execlp('python', 'Debugger', 'pdb.py', file)
+    os.execlp('python', 'python', 'pdb.py', file)
 
 
 def main(file, stop_event=None, input_event=None, user_inputs=None):
@@ -398,21 +395,28 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
             communicator.communicate(communicator_write, debugger_read, communicator_write_2, debugger_read_2, file,
                                      stop_event, input_event, user_inputs, pid, pid2)
         else:
+            os.setsid()
             os.close(debugger_read)
             os.close(communicator_write)
             os.close(debugger_read_2)
             os.close(communicator_write_2)
             launch_child(debugger_write_2, communicator_read_2, file)
+        
+        os.killpg(os.getpgid(pid2), signal.SIGTERM)
+        os.waitpid(pid2, 1)
         os.close(communicator_write_2)
         os.close(debugger_read_2)
-        os.kill(pid2, signal.SIGKILL)
     else:  # Child
+        os.setsid()
         os.close(debugger_read)
         os.close(communicator_write)
         launch_child(debugger_write, communicator_read, file)
+    
+    os.killpg(os.getpgid(pid), signal.SIGTERM)
+    os.waitpid(pid, 1)
     os.close(communicator_write)
     os.close(debugger_read)
-    os.kill(pid, signal.SIGKILL)
+
     # TODO remove this and make it part of os.read()
     # May already be done.
     for key, value in communicator.executed_code.iteritems():
