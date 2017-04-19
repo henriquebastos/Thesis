@@ -426,6 +426,8 @@ def display_executed_code(executed_code, code_box,
         display_line = ''
         if total >= 0 and start <= 0:
             if 'result' in value:
+                if value['result'] is None:
+                    value['result'] = 'None'
                 if '***' in value['result']:
                     code_box.tag_add('ERROR_HIGHLIGHT', '{0}.0'.format(value['lineno']),
                                      '{0}.end'.format(value['lineno']))
@@ -1449,6 +1451,7 @@ def reset_tags(code_box):
     for tag in code_box.tag_names():
         code_box.tag_delete(tag)
 
+    code_box.tag_configure('Token.Keyword.Namespace', foreground='orange red')
     code_box.tag_configure('Token.Keyword', foreground='orange red')
     code_box.tag_configure('Token.Operator', foreground='orange red')
     code_box.tag_configure('Token.Name.Function', foreground='lawn green')
@@ -1596,7 +1599,7 @@ def main_loop(scrolled_text_pair, lineno_box, from_box, input_box, variable_box,
 
     # print communicationThread
 
-    root.after(10, main_loop, scrolled_text_pair, lineno_box, from_box,
+    root.after(250, main_loop, scrolled_text_pair, lineno_box, from_box,
                input_box, variable_box, output_box, start_scale, scale,
                tree_wrapper, tree_viewer, combobox)
 

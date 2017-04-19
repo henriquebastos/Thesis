@@ -411,7 +411,6 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
         os.close(debugger_read)
         os.close(communicator_write)
         launch_child(debugger_write, communicator_read, file)
-    
     os.killpg(os.getpgid(pid), signal.SIGTERM)
     os.waitpid(pid, 1)
     os.close(communicator_write)
@@ -420,7 +419,7 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
     # TODO remove this and make it part of os.read()
     # May already be done.
     for key, value in communicator.executed_code.iteritems():
-        if 'result' in value:
+        if 'result' in value and value['result'] is not None:
             value['result'] = value['result'].rstrip('\n')
         for k, v in value['values'].iteritems():
             v = v.rstrip('\n')

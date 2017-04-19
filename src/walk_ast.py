@@ -80,6 +80,15 @@ class WalkAST(ast.NodeVisitor):
         # print 'Module Suite'
         self.generic_visit(self, node)
 
+    def visit_Import(self, node):
+        utils.set_type(self.data, node.lineno, 'import')
+        self.lineno = node.lineno
+        for name in node.names:
+            walker = WalkAST()
+            walker.lineno = node.lineno
+            walker.visit(name)
+            utils.combine_all_data(self.data, walker.data)
+
     #
     # stmt
     #
@@ -825,7 +834,10 @@ class WalkAST(ast.NodeVisitor):
     # alias = (identifier name, identifier? asname)
     def visit_alias(self, node):
         # print 'ALIAS'
-        self.generic_visit(node)
+        utils.add_string_to_data(self.lineno, self.data, node.name)
+        if node.asname is not None:
+            utils.add_string_to_data(self.lineno, self.data, node.asname)
+        # self.generic_visit(node)
 
 
 if __name__ == '__main__':
