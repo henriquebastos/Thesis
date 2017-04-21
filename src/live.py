@@ -1,6 +1,6 @@
 import ast
 from Tkinter import *
-from tkinter import ttk
+import ttk
 from tkMessageBox import showinfo
 import tkFileDialog
 import os
