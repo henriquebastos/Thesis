@@ -167,10 +167,36 @@ class TreeViewer(Frame):
             rowpos = rowpos + Rowsz
 
     def onClick(self, event, node):
-        label = event.widget
-        wrap  = self.wrapper
-        text  = '{0}'.format(wrap.value(node))       # on label click
-        result = wrap.onClick(node)                 # run tree action if any
-        if result:
-            text = text + '\n' + result             # add action result
-        showinfo('PyTree', text)                    # popup std dialog
+        # label = event.widget
+        # wrap  = self.wrapper
+        # text  = '{0}'.format(wrap.value(node))       # on label click
+        # result = wrap.onClick(node)                 # run tree action if any
+        # if result:
+        #     text = text + '\n' + result             # add action result
+        # showinfo('PyTree', text)                    # popup std dialog
+        toplevel = Toplevel()
+        text_box = Text(toplevel, wrap=NONE)
+        text_box.tag_configure("BOLD", font=('-weight bold'))
+
+        text_box.insert(INSERT, 'Class Name: ', 'BOLD')
+        text_box.insert(INSERT, node.class_name)
+        
+        text_box.insert(INSERT, '\nName: ', 'BOLD')
+        if len(node.name) > 0:
+            text_box.insert(INSERT, node.name)
+        
+        text_box.insert(INSERT, '\nID: ', 'BOLD')
+        text_box.insert(INSERT, node.simple_id)
+        
+        text_box.insert(INSERT, '\nVariables:\n', 'BOLD')
+        for k,v in node.variables.iteritems():
+            text_box.insert(INSERT, '    {0}\n'.format(v))
+        
+        text_box.insert(INSERT, 'Functions:\n', 'BOLD')
+        for f in node.functions:
+            text_box.insert(INSERT, '    {0}:\n'.format(f))
+            if f in node.function_variables:
+                for k,v in node.function_variables[f].iteritems():
+                    text_box.insert(INSERT, '        {0}\n'.format(v))
+        text_box.config(state=DISABLED)
+        text_box.grid(row=0, column=0)

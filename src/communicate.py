@@ -41,6 +41,8 @@ class Communicator(object):
         self.user_inputs_index = 0
         self.data = None
         self.variable_scope = None
+        self.prev_item = None
+        self.prev_assigned = None
         self.variable_values = {}
         self.additional_lines_call_point = {}
         self.looking_for = []
@@ -57,6 +59,11 @@ class Communicator(object):
         self.data, self.variable_scope = get_expressions(file)
         lineno = 0
 
+        # ATTEMPT TO FIX VARIABLES WHILE EVALUATING
+            # Step 1 evaluate variables and fix previous line in executed_code
+            # Step 2 is reavaluate variables and set them via p a1 = [1,2] in pdb1
+        # OR
+        # RUN PROGRAM 2 with its own lineno counter and run input requests on its own. (EASY)
         while lineno >= 0:
             output = os.read(self.fd_read, 1000)
             output2 = os.read(fd_read_2, 1000)
@@ -71,13 +78,11 @@ class Communicator(object):
             os.write(fd_write_2, 's\n')
             # Terminate on long loops
             if self.call > 1000 or self.stop_event.isSet():
-                os.kill(pid, signal.SIGUSR1)
-                os.kill(pid2, signal.SIGUSR1)
                 return
-        os.kill(pid, signal.SIGUSR1)
-        os.kill(pid2, signal.SIGUSR1)
 
     def in_correct_scope(self, scope, lineno):
+        if scope == 'global' and 'function_lines' not in self.data:
+            return True
         if scope == 'global' and 'function_lines' in self.data:
             for func,lines in self.data['function_lines'].iteritems():
                 if lineno in lines:
@@ -88,18 +93,25 @@ class Communicator(object):
             lineno in self.data['function_lines'][scope])
 
     def evaluate_variable_values(self, lineno):
+        if lineno < 0:
+            return
         for scope, variables in self.variable_scope.iteritems():
             if self.in_correct_scope(scope, lineno):
                 for variable in variables:
                     os.write(self.fd_write_2, 'p {0}\n'.format(variable))
                     result = os.read(self.fd_read_2, 1000)
-                    result = result.rstrip('\n(Pdb) ')
-                    if self.call > 0 and '*** NameError' not in result and '<built-in method' not in result:
-                        if self.call-1 not in self.variable_values:
-                            self.variable_values[self.call-1] = {}
-                        if scope not in self.variable_values[self.call-1]:
-                            self.variable_values[self.call-1][scope] = {}
-                        self.variable_values[self.call-1][scope][variable] = result
+                    result = result.rstrip('\n')
+                    if (self.call > 0 and '*** NameError' not in result and
+                            '<built-in method' not in result and
+                            'instance at 0x' not in result):
+                        if '.' not in variable:
+                            if self.call-1 not in self.variable_values:
+                                self.variable_values[self.call-1] = {}
+                            if scope not in self.variable_values[self.call-1]:
+                                self.variable_values[self.call-1][scope] = {}
+                            self.variable_values[self.call-1][scope][variable] = result
+                            os.write(self.fd_write, '!{0}={1}\n'.format(variable, result))
+
 
     def parse_line(self, line):
         lineno = -1
@@ -115,7 +127,7 @@ class Communicator(object):
         return int(lineno)
 
     def evaluate_line(self, data, lineno):
-        if ('type' in data[lineno] and data[lineno]['type'] == 'func' and
+        if ('type' in data[lineno] and (data[lineno]['type'] == 'func' or data[lineno]['type'] == 'class') and
                 'declared' not in data[lineno]):
             data[lineno]['declared'] = True
         else:
@@ -126,9 +138,13 @@ class Communicator(object):
                     if data[previous_lineno]['type'] == 'loop':
                         self.evaluate_loop_after(data, previous_lineno)
                     else:
-                        self.should_execute_previous = False
-                        self.call += 1
-                        self.evaluate_expressions(data, previous_lineno)
+                        if data[previous_lineno]['type'] != 'func':
+                            self.should_execute_previous = False
+                            self.call += 1
+                            self.evaluate_expressions(data, previous_lineno)
+                        else:
+                            self.should_execute_previous = False
+                            self.call += 1
             if 'type' in data[lineno]:
                 if data[lineno]['type'] == 'assign':
                     self.evaluate_assign(data, lineno)
@@ -150,6 +166,8 @@ class Communicator(object):
                     self.evaluate_return(data, lineno)
             else:
                 result = self.evaluate_expressions(data, lineno)
+                if result is not None and '\n' in result:
+                    result = result.split('\n')[-1]
                 self.executed_code[self.call]['result'] = result
                 self.call += 1
 
@@ -188,6 +206,7 @@ class Communicator(object):
                 assigned += ',' + a
         if result is not None:
             self.executed_code[self.call]['result'] = assigned + '=' + result
+            self.prev_assigned = assigned
         self.executed_code[self.call]['assigned'] = True
         self.call += 1
 
@@ -202,7 +221,8 @@ class Communicator(object):
         self.call += 1
 
     def evaluate_delete(self, data, lineno):
-        print 'TODO'
+        pass
+        # print 'TODO'
 
     def evaluate_func(self, data, lineno):
         result = self.evaluate_expressions(data, lineno)
@@ -211,12 +231,13 @@ class Communicator(object):
     def evaluate_list_assign(self, data, lineno):
         result = self.evaluate_and_store_expressions(data, lineno)
         assigned = None
-        for a in data[lineno]['assigned']:
-            if assigned is None:
-                assigned = a
-            else:
-                assigned += ',' + a
-        if result is not None:
+        if 'assigned' in data[lineno]:
+            for a in data[lineno]['assigned']:
+                if assigned is None:
+                    assigned = a
+                else:
+                    assigned += ',' + a
+        if result is not None and assigned is not None:
             self.executed_code[self.call]['result'] = assigned + '=' + result
         self.executed_code[self.call]['assigned'] = True
         self.call += 1
@@ -236,7 +257,10 @@ class Communicator(object):
 
     def evaluate_print(self, data, lineno):
         result = self.evaluate_expressions(data, lineno)
-        self.executed_code[self.call]['result'] = result
+        if 'expressions' in data[lineno] and len(data[lineno]['expressions']) == 0:
+            self.executed_code[self.call]['result'] = '\n'
+        else:
+            self.executed_code[self.call]['result'] = result
         self.executed_code[self.call]['print'] = True
         self.call += 1
 
@@ -259,7 +283,8 @@ class Communicator(object):
             final_expression = self.evaluate(data[lineno]['expressions'],
                                              False)
         if 'additional_lines' in data[lineno]:
-            self.additional_lines_call_point[lineno] = {}
+            if lineno not in self.additional_lines_call_point:
+                self.additional_lines_call_point[lineno] = {}
             for name in data[lineno]['additional_lines']:
                 if '.' in name:
                     name = name.split('.')[-1]
@@ -296,18 +321,35 @@ class Communicator(object):
     def evaluate_targets(self, data, lineno):
         if 'targets' in data[lineno]:
             self.setup_executed_code(lineno)
-            self.evaluate(data[lineno]['targets'], True)
+            return self.evaluate(data[lineno]['targets'], True)
+        return None
+
+    def is_class(self, item):
+        if 'classes' in self.data and item is not None:
+            return item.strip('()') in self.data['classes']
+        return False
 
     def evaluate(self, items, add_all):
         final_expression = None
+        if self.prev_item is not None and self.prev_assigned is not None:
+            os.write(self.fd_write, 'p self\n')
+            result = os.read(self.fd_read, 1000)
+            result = result.rstrip('\n')
+            # print 'Updating call: {0} from {1} to: {2}={3}'.format(self.call, self.executed_code[self.call-1]['values'][self.prev_item], self.prev_assigned, result)
+            self.executed_code[self.call-1]['values'][self.prev_item] = result
+            self.executed_code[self.call-1]['result'] = self.prev_assigned + '=' + result
+            self.prev_item = None
+            self.prev_assigned = None
         for item in items:
+            if self.is_class(item):
+                self.prev_item = item
             os.write(self.fd_write, 'p {0}\n'.format(item))
             result = os.read(self.fd_read, 1000)
-            result = result.rstrip('\n(Pdb) ')
+            result = result.rstrip('\n')
             self.executed_code[self.call]['values'][item] = result
             if add_all:
-                if '\n(Pdb) ' in result:
-                    result = result.rstrip('\n(Pdb) ')
+                if '\n' in result:
+                    result = result.rstrip('\n')
                     result = result[1:-1]
                 if final_expression is None:
                     final_expression = result
@@ -315,21 +357,23 @@ class Communicator(object):
                     final_expression += ',' + result
             else:
                 final_expression = result
-            if '\n(Pdb) ' in final_expression:
-                final_expression = final_expression.rstrip('\n(Pdb) ')[1:-1]
+            if '\n' in final_expression:
+                final_expression = final_expression.rstrip('\n')[1:-1]
         return final_expression
 
     def add_call_point(self, lineno):
         for t in self.looking_for:
             if lineno in t[1]:
-                self.additional_lines_call_point[t[0]][lineno] = self.call
+                if lineno not in self.additional_lines_call_point[t[0]]: 
+                    self.additional_lines_call_point[t[0]][lineno] = []
+                self.additional_lines_call_point[t[0]][lineno].append(self.call)
                 t[1].remove(lineno)
 
 
 def launch_child(fd_write, fd_read, file):
     os.dup2(fd_read, sys.stdin.fileno())
     os.dup2(fd_write, sys.stdout.fileno())
-    os.execlp('python', 'Debugger', 'pdb.py', file)
+    os.execlp('python', 'python', 'pdb_custom.py', file)
 
 
 def main(file, stop_event=None, input_event=None, user_inputs=None):
@@ -351,29 +395,34 @@ def main(file, stop_event=None, input_event=None, user_inputs=None):
             communicator.communicate(communicator_write, debugger_read, communicator_write_2, debugger_read_2, file,
                                      stop_event, input_event, user_inputs, pid, pid2)
         else:
+            os.setsid()
             os.close(debugger_read)
             os.close(communicator_write)
             os.close(debugger_read_2)
             os.close(communicator_write_2)
             launch_child(debugger_write_2, communicator_read_2, file)
+        
+        os.killpg(os.getpgid(pid2), signal.SIGTERM)
+        os.waitpid(pid2, 1)
         os.close(communicator_write_2)
         os.close(debugger_read_2)
-        os.kill(pid2, signal.SIGKILL)
     else:  # Child
+        os.setsid()
         os.close(debugger_read)
         os.close(communicator_write)
         launch_child(debugger_write, communicator_read, file)
+    os.killpg(os.getpgid(pid), signal.SIGTERM)
+    os.waitpid(pid, 1)
     os.close(communicator_write)
     os.close(debugger_read)
-    os.kill(pid, signal.SIGKILL)
 
     # TODO remove this and make it part of os.read()
     # May already be done.
     for key, value in communicator.executed_code.iteritems():
-        if 'result' in value:
-            value['result'] = value['result'].rstrip('\n(Pdb) ')
+        if 'result' in value and value['result'] is not None:
+            value['result'] = value['result'].rstrip('\n')
         for k, v in value['values'].iteritems():
-            v = v.rstrip('\n(Pdb) ')
+            v = v.rstrip('\n')
             value['values'][k] = v
     return communicator
 
