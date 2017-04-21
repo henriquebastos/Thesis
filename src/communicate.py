@@ -373,7 +373,7 @@ class Communicator(object):
 def launch_child(fd_write, fd_read, file):
     os.dup2(fd_read, sys.stdin.fileno())
     os.dup2(fd_write, sys.stdout.fileno())
-    os.execlp('python', 'python', 'pdb.py', file)
+    os.execlp('python', 'python', 'pdb_custom.py', file)
 
 
 def main(file, stop_event=None, input_event=None, user_inputs=None):
