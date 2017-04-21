@@ -1,15 +1,11 @@
 UI
-how to relate errors to the user
 validation
-comment highlights are broken
 duplicate function/class names in the file will cause issues
-update input read on boot 
 
 state of project 
 
 
 *** Possible additions ***
-- when hovering over left side code, move the right box info into view
 - threading for analysis
 - multiple code files
 - drag/drop
@@ -17,3 +13,18 @@ state of project
 *** No known issues ***
 - class name --> class lines
 Class scopes --> walk_ast.py line 118
+
+# Slowdown 1:
+display_variables (Called every time. this is bad)
+
+
+TODO:
+   1. CLASS TESTING DISPLAY OF EXECUTED CODE
+   3. Multiple files
+
+DONE:
+   1. Compiler issues go in variable box
+   2. Runtime issues are feedback on the line
+
+Highlight error lines
+Add space bewteen function calls in class.
